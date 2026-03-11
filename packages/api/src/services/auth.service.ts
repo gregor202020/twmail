@@ -55,7 +55,7 @@ export async function refreshToken(token: string) {
 
   let payload: JwtPayload;
   try {
-    payload = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
+    payload = jwt.verify(token, config.JWT_SECRET) as unknown as JwtPayload;
   } catch {
     throw new AppError(401, ErrorCode.UNAUTHORIZED, 'Invalid or expired refresh token');
   }
@@ -111,7 +111,7 @@ function generateToken(
     role: user.role,
     type,
   };
-  return jwt.sign(payload, config.JWT_SECRET, { expiresIn });
+  return jwt.sign(payload as any, config.JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
 
 export async function hashPassword(password: string): Promise<string> {

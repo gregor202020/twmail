@@ -7,7 +7,7 @@ import type {
   SegmentRule,
   SegmentRuleGroup,
 } from '@twmail/shared';
-import type { ExpressionBuilder } from 'kysely';
+import { sql, type ExpressionBuilder } from 'kysely';
 import type { Database } from '@twmail/shared';
 import { AppError } from '../plugins/error-handler.js';
 
@@ -361,17 +361,15 @@ function buildJsonbRule(
 
   switch (operator) {
     case 'eq':
-      return eb.ref('id').isNotNull().and(
-        eb.raw(`${jsonAccess} = '${value}'`) as any
-      );
+      return sql`custom_fields->>${sql.lit(path)} = ${sql.lit(String(value))}`;
     case 'neq':
-      return eb.raw(`${jsonAccess} != '${value}'`) as any;
+      return sql`custom_fields->>${sql.lit(path)} != ${sql.lit(String(value))}`;
     case 'contains':
-      return eb.raw(`${jsonAccess} ILIKE '%${value}%'`) as any;
+      return sql`custom_fields->>${sql.lit(path)} ILIKE ${'%' + String(value) + '%'}`;
     case 'is_set':
-      return eb.raw(`custom_fields ? '${path}'`) as any;
+      return sql`custom_fields ? ${sql.lit(path)}`;
     case 'is_not_set':
-      return eb.raw(`NOT (custom_fields ? '${path}')`) as any;
+      return sql`NOT (custom_fields ? ${sql.lit(path)})`;
     default:
       throw new AppError(400, ErrorCode.VALIDATION_ERROR, `Unsupported operator for custom field: ${operator}`);
   }

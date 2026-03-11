@@ -44,8 +44,9 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
 
     // Fastify validation errors
-    if (error.validation) {
-      const details = error.validation.map((v) => ({
+    const fastifyError = error as any;
+    if (fastifyError.validation) {
+      const details = fastifyError.validation.map((v: any) => ({
         field: v.instancePath || v.params?.missingProperty || 'unknown',
         message: v.message || 'Invalid value',
       }));
@@ -59,7 +60,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
 
     // Rate limit errors
-    if (error.statusCode === 429) {
+    if (fastifyError.statusCode === 429) {
       return reply.status(429).send({
         error: {
           code: ErrorCode.RATE_LIMITED,

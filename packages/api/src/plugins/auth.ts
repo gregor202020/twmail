@@ -53,7 +53,7 @@ const plugin: FastifyPluginAsync = async (app) => {
 async function authenticateJwt(request: import('fastify').FastifyRequest, token: string): Promise<void> {
   const config = getConfig();
   try {
-    const payload = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, config.JWT_SECRET) as unknown as JwtPayload;
     if (payload.type !== 'access') {
       throw new AppError(401, ErrorCode.UNAUTHORIZED, 'Invalid token type');
     }
