@@ -1,0 +1,21 @@
+{
+  "name": "twmail",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/api",
+    "packages/workers"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=packages/api",
+    "dev:workers": "npm run dev --workspace=packages/workers",
+    "build": "npm run build --workspaces",
+    "test": "npm test --workspace=packages/api",
+    "lint": "tsc --noEmit --project packages/api/tsconfig.json",
+    "db:migrate": "psql $DATABASE_URL -f db/migrations/001_initial_schema.sql"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

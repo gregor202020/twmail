@@ -1,0 +1,33 @@
+node_modules/
+dist/
+*.js
+*.d.ts
+*.js.map
+!jest.config.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pgdata/
+redisdata/
+assets/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
