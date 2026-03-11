@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:admin": "tsx src/seed-admin.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.0",

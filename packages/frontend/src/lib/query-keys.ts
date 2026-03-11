@@ -53,4 +53,9 @@ export const queryKeys = {
     mappings: ['imports', 'mappings'] as const,
   },
   apiKeys: { list: ['api-keys', 'list'] as const },
+  users: {
+    all: ['users'] as const,
+    list: (filters: Record<string, unknown>) => ['users', 'list', filters] as const,
+    detail: (id: number) => ['users', 'detail', id] as const,
+  },
 };

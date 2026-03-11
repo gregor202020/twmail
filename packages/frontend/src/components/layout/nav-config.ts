@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Send, FileText, Filter, BarChart3, Settings,
+  LayoutDashboard, Users, Send, FileText, Filter, BarChart3, Settings, HelpCircle,
 } from 'lucide-react';
 
 export const navItems = [
@@ -12,6 +12,7 @@ export const navItems = [
 ] as const;
 
 export const bottomNavItems = [
+  { icon: HelpCircle, label: 'Help', href: '/help' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ] as const;
 
