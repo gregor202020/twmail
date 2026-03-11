@@ -79,8 +79,8 @@ Frontend dashboard for TWMail, a self-hosted email marketing platform & CRM for 
 - Minimal layout: no sidebar, centered card
 - TW logo above form (red, larger)
 - Fields: Email, Password
-- "Forgot password" link
 - Login button (blue `#0170B9`)
+- No "Forgot password" for v1 (single-tenant, admin can reset via CLI)
 
 ### Auth Flow
 - Login POST → API returns JWT access + refresh tokens
@@ -105,7 +105,7 @@ Frontend dashboard for TWMail, a self-hosted email marketing platform & CRM for 
 
 ### Recent Campaigns
 - Compact list (4-5 items)
-- Status dot (green=sent, amber=scheduled, red=sending, gray=draft)
+- Status dot (green=sent, amber=scheduled, blue pulse=sending, gray=draft)
 - Campaign name, open rate, time ago
 
 ### Quick Actions
@@ -118,8 +118,9 @@ Frontend dashboard for TWMail, a self-hosted email marketing platform & CRM for 
 - DataTable: Name, Email, Status (badge), Lists, Last Activity, Created
 - Sortable columns, server-side search, paginated (50 per page)
 - Status filter tabs: All / Active / Unsubscribed / Bounced
-- Bulk select → floating action bar: Add to List, Remove, Export CSV, Delete
-- "Add Contact" button in top bar
+- Bulk select → floating action bar: Add to List, Remove from List, Delete
+- Note: CSV export and list management are v2 features (backend APIs needed)
+- "Add Contact" button in top bar → slide-out drawer with form: email (required), first name, last name, custom fields, list assignment. Uses `POST /api/contacts`.
 
 ### Contact Detail (`/contacts/:id`)
 - Profile header: name, email, status badge, created date, last activity
@@ -141,10 +142,12 @@ Frontend dashboard for TWMail, a self-hosted email marketing platform & CRM for 
 ## 8. Campaigns
 
 ### List View (`/campaigns`)
-- Status filter tabs: All / Draft / Scheduled / Sending / Sent
+- Status filter tabs: All / Draft / Scheduled / Sending / Sent / Paused / Cancelled
 - Card or table view toggle
 - Each campaign shows: name, status badge, recipients count, open rate (if sent), sent/scheduled date
-- Actions: Edit, Duplicate, Delete
+- Actions: Edit, Duplicate, Pause (if sending/scheduled), Cancel (if sending/scheduled), Delete
+- After Duplicate: redirect to new campaign's edit page
+- After Send/Schedule confirmation: redirect to campaign report page
 - "New Campaign" button (red `#C41E2A`)
 
 ### Create/Edit (`/campaigns/:id/edit`)
@@ -175,7 +178,6 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 #### Section 4: Scheduling
 - **Send Now** — radio option, immediate send
 - **Schedule** — date picker + time picker + timezone selector
-- **Smart Send** — toggle, sends at each contact's optimal open time based on engagement history
 
 #### Section 5: A/B Testing
 - Toggle on/off (off by default)
@@ -217,9 +219,9 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 ### Grid View (`/templates`)
 - Template cards in 3-4 column grid
 - Card: thumbnail preview, name, category badge, created date
-- Hover overlay: "Edit" and "Use in Campaign" buttons
+- Hover overlay: "Edit", "Clone", and "Use in Campaign" buttons
 - Filter by category (dropdown)
-- "New Template" button
+- "New Template" button (navigates to `/templates/new/edit`)
 
 ### Template Editor (`/templates/:id/edit`)
 - Full-screen GrapeJS editor
@@ -227,7 +229,8 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 - Center: MJML canvas with drag-and-drop
 - Right panel: Style properties for selected element (colors, spacing, fonts, link URLs)
 - Top bar: Template name (editable), Save, Preview, Desktop/Mobile toggle, Back button
-- Hybrid mode: templates provide locked structural sections. Users edit content within sections. "Unlock full editor" toggle for power users.
+- Asset manager integration: GrapeJS asset manager configured to use `POST /api/assets/upload` for uploads and `GET /api/assets` for browsing. Users can upload and select images directly within the editor.
+- GrapeJS provides its own component locking via `editable`, `draggable`, `removable` traits on components. Template blocks can be marked as non-removable/non-draggable while keeping content editable. No custom plugin needed — this is built-in GrapeJS functionality.
 
 ### Template Picker (modal)
 - Used when creating a campaign, invoked from Design section
@@ -248,8 +251,13 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 - **Rules within a group** with AND logic
 - Each rule: Field picker (dropdown of contact fields + custom fields) → Operator (equals, contains, greater than, before, after, is set, is not set) → Value input
 - "Add Rule" button within a group, "Add Group" button for new OR group
-- **Live count preview** — shows matching contact count as rules change (debounced API call)
+- **Live count preview** — shows matching contact count as rules change (debounced 500ms API call to `GET /api/segments/:id/count`)
 - Save button
+
+### Segment Detail (`/segments/:id`)
+- Contact list for this segment (paginated, via `GET /api/segments/:id/contacts`)
+- For static segments: "Add Contacts" and "Remove" actions
+- Link to edit rules
 
 ## 11. Reports
 
@@ -272,28 +280,30 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 
 ## 12. Settings
 
-### General (`/settings`)
-- Organization name, default sender name, default sender email, timezone picker
-- Save button
+> **Backend note:** Settings pages for General, API Keys, Users, and Domain require new backend API routes that don't exist yet. These will be added to the backend as part of the implementation plan. The Webhooks settings page already has full backend support.
 
-### API Keys (`/settings/api-keys`)
-- Table: Name, Key prefix (masked), Created, Last Used
-- "Create API Key" button → modal with name input → shows full key once (copy button, warning it won't be shown again)
-- Revoke button with confirmation
-
-### Webhooks (`/settings/webhooks`)
+### Webhooks (`/settings/webhooks`) — Has Backend
 - Endpoint table: URL, Events (badges), Status (active/disabled), Failure count
 - Create/Edit modal: URL, event type checkboxes, active toggle
 - Secret display (masked, click to reveal, copy button)
 - "Test" button to send a test payload
 - Delivery log: expandable per-endpoint, shows recent deliveries with status/response
 
-### Users (`/settings/users`)
+### General (`/settings`) — Needs Backend
+- Organization name, default sender name, default sender email, timezone picker
+- Save button
+
+### API Keys (`/settings/api-keys`) — Needs Backend
+- Table: Name, Key prefix (masked), Created, Last Used
+- "Create API Key" button → modal with name input → shows full key once (copy button, warning it won't be shown again)
+- Revoke button with confirmation
+
+### Users (`/settings/users`) — Needs Backend
 - User table: Name, Email, Role (Admin/Editor/Viewer), Last Login
 - Invite button → modal: email + role picker
 - Edit role, remove user
 
-### Domain (`/settings/domain`)
+### Domain (`/settings/domain`) — Needs Backend
 - SES domain verification status
 - DNS records to add (DKIM, SPF, DMARC) displayed as copyable text
 - Verification check button
@@ -310,7 +320,7 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 
 ### StatusBadge
 - Color-coded pill component
-- Campaign statuses: Draft (gray), Scheduled (amber), Sending (red pulse), Sent (green), Paused (amber), Cancelled (gray)
+- Campaign statuses: Draft (gray), Scheduled (amber), Sending (blue pulse), Sent (green), Paused (amber), Cancelled (gray)
 - Contact statuses: Active (green), Unsubscribed (gray), Bounced (red), Complained (red)
 
 ### EmptyState
@@ -335,7 +345,7 @@ Single-page accordion — sections stack vertically, auto-collapse when complete
 - **Query key factory:** Centralized in `lib/query-keys.ts` for consistent cache invalidation.
 - **Form state:** React Hook Form with Zod schemas matching the API's Zod validation.
 - **UI state:** React useState/useContext for sidebar collapse, modals, active tabs. No global store needed.
-- **Real-time updates:** Polling for campaign send progress (every 5s while sending). Import progress via polling.
+- **Real-time updates:** Polling for campaign send progress (every 5s while sending — progress bar on campaign report page showing sent/total). Import progress via polling (progress bar on import page).
 
 ## 15. API Integration
 
@@ -348,19 +358,24 @@ All API calls go through `lib/api-client.ts`:
 ### Key API Endpoints Consumed
 | Frontend Page | API Endpoints |
 |---|---|
+| Login | `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Dashboard | `GET /api/reports/overview` |
-| Contacts List | `GET /api/contacts` |
-| Contact Detail | `GET /api/contacts/:id`, `GET /api/contacts/:id/events` |
-| Contact Import | `POST /api/imports/paste`, `POST /api/imports/csv`, `GET /api/imports/:id` |
+| Contacts List | `GET /api/contacts`, `POST /api/contacts` (create), `POST /api/contacts/search` |
+| Contact Detail | `GET /api/contacts/:id`, `PATCH /api/contacts/:id`, `DELETE /api/contacts/:id`, `GET /api/contacts/:id/timeline` |
+| Contact Import | `POST /api/imports/paste`, `POST /api/imports/csv`, `GET /api/imports/:id`, `GET /api/imports/:id/errors`, `POST /api/imports/mappings`, `GET /api/imports/mappings` |
 | Campaigns List | `GET /api/campaigns` |
-| Campaign Edit | `POST/PATCH /api/campaigns/:id`, `POST /api/campaigns/:id/send`, `POST /api/campaigns/:id/schedule` |
+| Campaign Edit | `POST/PATCH /api/campaigns/:id`, `POST /api/campaigns/:id/send`, `POST /api/campaigns/:id/schedule`, `POST /api/campaigns/:id/pause`, `POST /api/campaigns/:id/cancel`, `POST /api/campaigns/:id/duplicate` |
 | Campaign A/B | `POST /api/campaigns/:id/ab-test`, `GET /api/campaigns/:id/ab-results` |
 | Campaign Report | `GET /api/campaigns/:id/report`, `GET /api/campaigns/:id/recipients` |
 | Templates | `GET/POST/PATCH/DELETE /api/templates`, `POST /api/templates/:id/clone` |
-| Segments | `GET/POST/PATCH/DELETE /api/segments` |
-| Reports | `GET /api/reports/*` |
-| Assets | `POST /api/assets/upload`, `GET/DELETE /api/assets` |
-| Settings/Webhooks | `GET/POST/PATCH/DELETE /api/webhook-endpoints` |
+| Segments | `GET/POST/PATCH/DELETE /api/segments`, `GET /api/segments/:id/count`, `GET /api/segments/:id/contacts`, `POST /api/segments/:id/contacts`, `DELETE /api/segments/:id/contacts/:cid` |
+| Reports Overview | `GET /api/reports/overview` |
+| Reports Growth | `GET /api/reports/growth` |
+| Reports Engagement | `GET /api/reports/engagement` |
+| Reports Deliverability | `GET /api/reports/deliverability` |
+| Reports Campaigns | `GET /api/reports/campaigns` |
+| Assets | `POST /api/assets/upload`, `GET /api/assets`, `DELETE /api/assets/:id` |
+| Settings/Webhooks | `GET/POST/PATCH/DELETE /api/webhooks`, `POST /api/webhooks/:id/test`, `GET /api/webhooks/:id/deliveries` |
 
 ## 16. Error Handling & UX Patterns
 
@@ -403,10 +418,13 @@ packages/frontend/
             report/page.tsx         # Campaign report
         templates/
           page.tsx                  # Template grid
-          [id]/edit/page.tsx        # Template editor
+          new/edit/page.tsx         # New template editor
+          [id]/edit/page.tsx        # Edit template editor
         segments/
           page.tsx                  # Segment list
-          [id]/edit/page.tsx        # Segment builder
+          new/edit/page.tsx         # New segment builder
+          [id]/page.tsx             # Segment detail (contact list)
+          [id]/edit/page.tsx        # Edit segment builder
         reports/
           page.tsx                  # Reports overview
           campaigns/page.tsx        # Campaign comparison
