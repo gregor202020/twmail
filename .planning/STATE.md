@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-compliance-02-01-PLAN.md
-last_updated: "2026-03-12T22:58:49.642Z"
+stopped_at: Completed 03-data-integrity-analytics-03-01-PLAN.md
+last_updated: "2026-03-12T23:16:05.321Z"
 last_activity: 2026-03-13 — Plan 02-02 complete (import suppression guard + compliance verification)
 progress:
   total_phases: 12
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 4
+  total_plans: 7
+  completed_plans: 5
   percent: 60
 ---
 
@@ -52,6 +52,7 @@ Progress: [██████░░░░] 60%
 *Updated after each plan completion*
 | Phase 02-compliance P02 | 15 | 2 tasks | 1 files |
 | Phase 02-compliance P01 | 173 | 2 tasks | 5 files |
+| Phase 03-data-integrity-analytics P01 | 7 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,9 @@ Recent decisions affecting current work:
 - [02-02] COMP-02/03/04/05/08 verified by code trace — all already correctly implemented
 - [Phase 02-compliance]: physical_address stored as NOT NULL DEFAULT '' — empty string means not configured, avoids nullable column complexity
 - [Phase 02-compliance]: SNS idempotency via partial unique index + ON CONFLICT DO NOTHING with numInsertedOrUpdatedRows guard to prevent counter drift
+- [Phase 03-01]: detectMachineOpen exported for direct unit testing without DB mocks
+- [Phase 03-01]: MACHINE_UA_PATTERNS uses case-insensitive regex to catch variant capitalizations
+- [Phase 03-01]: recordOpen unchanged — machine open path already correctly omits first_open_at (DATA-05)
 
 ### Pending Todos
 
@@ -80,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T22:53:28.982Z
-Stopped at: Completed 02-compliance-02-01-PLAN.md
+Last session: 2026-03-12T23:16:05.318Z
+Stopped at: Completed 03-data-integrity-analytics-03-01-PLAN.md
 Resume file: None
