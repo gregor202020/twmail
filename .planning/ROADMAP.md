@@ -81,8 +81,8 @@ Plans:
   2. Campaign sent/failed/skipped counters remain accurate after any error condition during bulk send
 **Plans:** 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — MPP detection enhancement + variant open/click behavior tests
-- [ ] 03-02-PLAN.md — Variant counter fix + A/B eval sample size guard + win probability threshold
+- [ ] 04-01-PLAN.md — Replace silent .catch(() => {}) with contextual error logging (DATA-06)
+- [ ] 04-02-PLAN.md — Add try/finally counter protection to bulk-send worker (DATA-07)
 
 ### Phase 5: Data Integrity — Tracking & Segments
 **Goal**: Click tracking redirects correctly and segments produce accurate contact lists
@@ -201,7 +201,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. Critical Bug Fixes | 3/3 | Complete | 2026-03-13 |
 | 2. Compliance | 2/2 | Complete   | 2026-03-12 |
 | 3. Data Integrity — Analytics | 2/2 | Complete   | 2026-03-12 |
-| 4. Data Integrity — Error Handling | 0/TBD | Not started | - |
+| 4. Data Integrity — Error Handling | 0/2 | Planned | - |
 | 5. Data Integrity — Tracking & Segments | 0/TBD | Not started | - |
 | 6. Infrastructure & Security | 0/TBD | Not started | - |
 | 7. Code Quality — Tooling | 0/TBD | Not started | - |
