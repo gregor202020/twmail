@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-data-integrity-analytics-03-01-PLAN.md
-last_updated: "2026-03-12T23:16:05.321Z"
+stopped_at: Completed 03-data-integrity-analytics-03-02-PLAN.md
+last_updated: "2026-03-12T23:22:11.932Z"
 last_activity: 2026-03-13 — Plan 02-02 complete (import suppression guard + compliance verification)
 progress:
   total_phases: 12
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 60
 ---
 
@@ -53,6 +53,7 @@ Progress: [██████░░░░] 60%
 | Phase 02-compliance P02 | 15 | 2 tasks | 1 files |
 | Phase 02-compliance P01 | 173 | 2 tasks | 5 files |
 | Phase 03-data-integrity-analytics P01 | 7 | 2 tasks | 2 files |
+| Phase 03-data-integrity-analytics P02 | 183 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 03-01]: detectMachineOpen exported for direct unit testing without DB mocks
 - [Phase 03-01]: MACHINE_UA_PATTERNS uses case-insensitive regex to catch variant capitalizations
 - [Phase 03-01]: recordOpen unchanged — machine open path already correctly omits first_open_at (DATA-05)
+- [Phase 03-02]: calculateBayesianWinProbability exported for direct unit testing without DB mocks
+- [Phase 03-02]: WIN_PROBABILITY_THRESHOLD = 0.95 hardcoded; minSampleSize defaults to 100, overridable via ab_test_config
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T23:16:05.318Z
-Stopped at: Completed 03-data-integrity-analytics-03-01-PLAN.md
+Last session: 2026-03-12T23:22:11.929Z
+Stopped at: Completed 03-data-integrity-analytics-03-02-PLAN.md
 Resume file: None

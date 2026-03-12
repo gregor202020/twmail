@@ -31,8 +31,8 @@ Requirements for production-ready launch. Each maps to roadmap phases.
 
 - [x] **DATA-01**: MPP machine open detection correctly identifies Apple Mail proxy user-agents
 - [x] **DATA-02**: Machine opens flagged but not deleted (preserved for data completeness)
-- [ ] **DATA-03**: A/B test winner logic uses human opens/clicks, not raw (MPP-inflated) data
-- [ ] **DATA-04**: A/B test has minimum sample size guard before declaring winner
+- [x] **DATA-03**: A/B test winner logic uses human opens/clicks, not raw (MPP-inflated) data
+- [x] **DATA-04**: A/B test has minimum sample size guard before declaring winner
 - [x] **DATA-05**: Resend-to-non-openers excludes machine opens from "opened" definition
 - [ ] **DATA-06**: All .catch(() => {}) replaced with proper error logging
 - [ ] **DATA-07**: Campaign counters accurate (no silent drift from swallowed errors)
@@ -140,8 +140,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-08 | Phase 2 | Complete |
 | DATA-01 | Phase 3 | Complete |
 | DATA-02 | Phase 3 | Complete |
-| DATA-03 | Phase 3 | Pending |
-| DATA-04 | Phase 3 | Pending |
+| DATA-03 | Phase 3 | Complete |
+| DATA-04 | Phase 3 | Complete |
 | DATA-05 | Phase 3 | Complete |
 | DATA-06 | Phase 4 | Pending |
 | DATA-07 | Phase 4 | Pending |
