@@ -15,16 +15,17 @@ ENV API_URL=http://api:3000
 RUN npm run build --workspace=packages/frontend
 
 FROM node:22-alpine
-WORKDIR /app
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/packages/frontend/.next ./packages/frontend/.next
-COPY --from=base /app/packages/frontend/public ./packages/frontend/public
-COPY --from=base /app/packages/frontend/package.json ./packages/frontend/
-COPY --from=base /app/packages/shared/dist ./packages/shared/dist
-COPY --from=base /app/packages/shared/package.json ./packages/shared/
-COPY --from=base /app/package.json ./
+WORKDIR /app/packages/frontend
+COPY --from=base /app/node_modules /app/node_modules
+COPY --from=base /app/packages/frontend/.next ./.next
+COPY --from=base /app/packages/frontend/public ./public
+COPY --from=base /app/packages/frontend/package.json ./
+COPY --from=base /app/packages/frontend/node_modules ./node_modules
+COPY --from=base /app/packages/shared/dist /app/packages/shared/dist
+COPY --from=base /app/packages/shared/package.json /app/packages/shared/
+COPY --from=base /app/package.json /app/
 
 ENV NODE_ENV=production
 ENV API_URL=http://api:3000
 EXPOSE 3001
-CMD ["npx", "--prefix", "packages/frontend", "next", "start", "-p", "3001"]
+CMD ["npx", "next", "start", "-p", "3001"]
