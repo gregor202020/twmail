@@ -220,6 +220,18 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
       .where('id', '=', message.campaign_id)
       .execute();
 
+    // Update variant counters for A/B test (human open)
+    if (message.variant_id) {
+      await db
+        .updateTable('campaign_variants')
+        .set((eb: any) => ({
+          total_opens: eb('total_opens', '+', 1),
+          total_human_opens: eb('total_human_opens', '+', 1),
+        }))
+        .where('id', '=', message.variant_id)
+        .execute();
+    }
+
     // Update contact last_open_at
     await db
       .updateTable('contacts')
@@ -232,6 +244,17 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
       .set((eb: any) => ({ total_opens: eb('total_opens', '+', 1) }))
       .where('id', '=', message.campaign_id)
       .execute();
+
+    // Update variant counters for A/B test (machine open)
+    if (message.variant_id) {
+      await db
+        .updateTable('campaign_variants')
+        .set((eb: any) => ({
+          total_opens: eb('total_opens', '+', 1),
+        }))
+        .where('id', '=', message.variant_id)
+        .execute();
+    }
 
     await db
       .updateTable('messages')
@@ -288,6 +311,18 @@ async function recordClick(
     }))
     .where('id', '=', message.campaign_id)
     .execute();
+
+  // Update variant counters for A/B test
+  if (message.variant_id) {
+    await db
+      .updateTable('campaign_variants')
+      .set((eb: any) => ({
+        total_clicks: eb('total_clicks', '+', 1),
+        total_human_clicks: eb('total_human_clicks', '+', 1),
+      }))
+      .where('id', '=', message.variant_id)
+      .execute();
+  }
 
   // Update contact
   await db
