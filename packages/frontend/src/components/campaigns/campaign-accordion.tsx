@@ -1,8 +1,11 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
 import {
   ChevronDown, Check, Settings, Users, Palette, Clock, FlaskConical, RotateCcw, Rocket,
+  FileText, Plus, Save, BookmarkPlus, BarChart,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
@@ -17,8 +20,18 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { TemplatePicker } from '@/components/editor/template-picker';
+import type { GrapesEditorRef } from '@/components/editor/grapes-editor';
 import type { Campaign, Segment, List } from '@/types';
+
+const GrapesEditor = dynamic(
+  () => import('@/components/editor/grapes-editor').then((mod) => ({ default: mod.GrapesEditor })),
+  { ssr: false, loading: () => <Skeleton className="min-h-[600px]" /> }
+);
 
 // ============================================================================
 // Types
@@ -50,6 +63,16 @@ interface CampaignFormData {
   resend_different_subject: string;
   resend_engaged_only: boolean;
   resend_max: number;
+  reply_to: string;
+  tags: string;
+  utm_enabled: boolean;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  ga_tracking: boolean;
+  tracking_domain: string;
+  send_time_optimization: boolean;
 }
 
 interface CampaignAccordionProps {
@@ -96,6 +119,16 @@ function getInitialFormData(campaign: Campaign): CampaignFormData {
     resend_different_subject: (resendConfig.different_subject as string) ?? '',
     resend_engaged_only: (resendConfig.engaged_only as boolean) ?? false,
     resend_max: (resendConfig.max as number) ?? 1,
+    reply_to: campaign.reply_to ?? '',
+    tags: campaign.tags ?? '',
+    utm_enabled: campaign.utm_enabled ?? false,
+    utm_source: campaign.utm_source ?? 'twmail',
+    utm_medium: campaign.utm_medium ?? 'email',
+    utm_campaign: campaign.utm_campaign ?? campaign.name ?? '',
+    utm_content: campaign.utm_content ?? '',
+    ga_tracking: campaign.ga_tracking ?? false,
+    tracking_domain: campaign.tracking_domain ?? '',
+    send_time_optimization: campaign.send_time_optimization ?? false,
   };
 }
 
@@ -172,6 +205,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
   const recipientsValid = !!(formData.segment_id || formData.list_id);
   const designValid = !!campaign.content_html;
   const schedulingValid = formData.schedule_type === 'now' || !!(formData.scheduled_date && formData.scheduled_time);
+  const trackingValid = true; // always valid, optional settings
   const abValid = !formData.ab_test_enabled || formData.ab_test_variants.every((v) => v.value);
   const resendValid = !formData.resend_enabled || !!formData.resend_delay;
 
@@ -182,6 +216,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
     { title: 'Recipients', icon: Users, valid: recipientsValid },
     { title: 'Design', icon: Palette, valid: designValid },
     { title: 'Scheduling', icon: Clock, valid: schedulingValid },
+    { title: 'Tracking', icon: BarChart, valid: trackingValid },
     { title: 'A/B Testing', icon: FlaskConical, valid: abValid },
     { title: 'Resend to Non-Openers', icon: RotateCcw, valid: resendValid },
     { title: 'Review & Send', icon: Rocket, valid: allValid },
@@ -215,6 +250,14 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                 <Label htmlFor="from_email" className="text-xs text-text-muted mb-1">From Email</Label>
                 <Input id="from_email" type="email" value={formData.from_email} onChange={(e) => update({ from_email: e.target.value })} onBlur={handleBlurSave} />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="reply_to" className="text-xs text-text-muted mb-1">Reply-to Email (optional)</Label>
+              <Input id="reply_to" type="email" value={formData.reply_to} onChange={(e) => update({ reply_to: e.target.value })} onBlur={handleBlurSave} placeholder="Leave blank to use From Email" />
+            </div>
+            <div>
+              <Label htmlFor="tags" className="text-xs text-text-muted mb-1">Campaign Tags</Label>
+              <Input id="tags" value={formData.tags} onChange={(e) => update({ tags: e.target.value })} onBlur={handleBlurSave} placeholder="Comma-separated tags, e.g. newsletter, promo, Q1" />
             </div>
           </div>
         )}
@@ -291,20 +334,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
       <div>
         <SectionHeader number={3} title={sections[2].title} icon={sections[2].icon} isValid={sections[2].valid} isOpen={openSection === 2} onToggle={() => toggleSection(2)} />
         {openSection === 2 && (
-          <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5">
-            <Card>
-              <CardContent>
-                <div className="text-center py-10">
-                  <Palette className="w-8 h-8 text-text-muted mx-auto mb-3" />
-                  <p className="text-sm text-text-secondary mb-1">Select a template or start from blank</p>
-                  <p className="text-xs text-text-muted mb-4">The visual editor will be available in a future update.</p>
-                  <Button variant="outline" size="sm" disabled>
-                    Choose Template
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <DesignSection campaign={campaign} onSave={onSave} isSaving={isSaving} />
         )}
       </div>
 
@@ -358,14 +388,80 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <Label className="text-xs">Send Time Optimization</Label>
+                <p className="text-[11px] text-text-muted mt-0.5">Send at each recipient&apos;s optimal time based on past engagement</p>
+              </div>
+              <Switch
+                checked={formData.send_time_optimization}
+                onCheckedChange={(checked) => update({ send_time_optimization: !!checked })}
+              />
+            </div>
+            {formData.send_time_optimization && (
+              <div className="bg-surface rounded-lg p-3 text-xs text-text-secondary">
+                Emails will be sent over a 24-hour window at each contact&apos;s historically optimal engagement time.
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Section 5: A/B Testing */}
+      {/* Section 5: Tracking */}
       <div>
         <SectionHeader number={5} title={sections[4].title} icon={sections[4].icon} isValid={sections[4].valid} isOpen={openSection === 4} onToggle={() => toggleSection(4)} />
         {openSection === 4 && (
+          <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">UTM Tracking</Label>
+              <Switch
+                checked={formData.utm_enabled}
+                onCheckedChange={(checked) => update({ utm_enabled: !!checked })}
+              />
+            </div>
+            {formData.utm_enabled && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="utm_source" className="text-xs text-text-muted mb-1">utm_source</Label>
+                    <Input id="utm_source" value={formData.utm_source} onChange={(e) => update({ utm_source: e.target.value })} onBlur={handleBlurSave} placeholder="twmail" />
+                  </div>
+                  <div>
+                    <Label htmlFor="utm_medium" className="text-xs text-text-muted mb-1">utm_medium</Label>
+                    <Input id="utm_medium" value={formData.utm_medium} onChange={(e) => update({ utm_medium: e.target.value })} onBlur={handleBlurSave} placeholder="email" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="utm_campaign" className="text-xs text-text-muted mb-1">utm_campaign</Label>
+                    <Input id="utm_campaign" value={formData.utm_campaign} onChange={(e) => update({ utm_campaign: e.target.value })} onBlur={handleBlurSave} placeholder="Campaign name" />
+                  </div>
+                  <div>
+                    <Label htmlFor="utm_content" className="text-xs text-text-muted mb-1">utm_content (optional)</Label>
+                    <Input id="utm_content" value={formData.utm_content} onChange={(e) => update({ utm_content: e.target.value })} onBlur={handleBlurSave} placeholder="e.g. variant-a" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Google Analytics Tracking</Label>
+              <Switch
+                checked={formData.ga_tracking}
+                onCheckedChange={(checked) => update({ ga_tracking: !!checked })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="tracking_domain" className="text-xs text-text-muted mb-1">Custom Tracking Domain (optional)</Label>
+              <Input id="tracking_domain" value={formData.tracking_domain} onChange={(e) => update({ tracking_domain: e.target.value })} onBlur={handleBlurSave} placeholder="e.g. track.yourdomain.com" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Section 6: A/B Testing */}
+      <div>
+        <SectionHeader number={6} title={sections[5].title} icon={sections[5].icon} isValid={sections[5].valid} isOpen={openSection === 5} onToggle={() => toggleSection(5)} />
+        {openSection === 5 && (
           <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-xs">Enable A/B Testing</Label>
@@ -457,10 +553,10 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
         )}
       </div>
 
-      {/* Section 6: Resend to Non-Openers */}
+      {/* Section 7: Resend to Non-Openers */}
       <div>
-        <SectionHeader number={6} title={sections[5].title} icon={sections[5].icon} isValid={sections[5].valid} isOpen={openSection === 5} onToggle={() => toggleSection(5)} />
-        {openSection === 5 && (
+        <SectionHeader number={7} title={sections[6].title} icon={sections[6].icon} isValid={sections[6].valid} isOpen={openSection === 6} onToggle={() => toggleSection(6)} />
+        {openSection === 6 && (
           <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-xs">Enable Resend to Non-Openers</Label>
@@ -537,10 +633,10 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
         )}
       </div>
 
-      {/* Section 7: Review & Send */}
+      {/* Section 8: Review & Send */}
       <div>
-        <SectionHeader number={7} title={sections[6].title} icon={sections[6].icon} isValid={sections[6].valid} isOpen={openSection === 6} onToggle={() => toggleSection(6)} />
-        {openSection === 6 && (
+        <SectionHeader number={8} title={sections[7].title} icon={sections[7].icon} isValid={sections[7].valid} isOpen={openSection === 7} onToggle={() => toggleSection(7)} />
+        {openSection === 7 && (
           <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-5">
             {/* Summary */}
             <div className="space-y-3">
@@ -566,6 +662,18 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                   <span className="text-text-muted">Schedule:</span>{' '}
                   <span className="text-text-primary font-medium">
                     {formData.schedule_type === 'now' ? 'Send immediately' : `${formData.scheduled_date} ${formData.scheduled_time}`}
+                  </span>
+                </div>
+                <div className="bg-surface rounded-lg p-3">
+                  <span className="text-text-muted">UTM Tracking:</span>{' '}
+                  <span className="text-text-primary font-medium">
+                    {formData.utm_enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className="bg-surface rounded-lg p-3">
+                  <span className="text-text-muted">Tags:</span>{' '}
+                  <span className="text-text-primary font-medium">
+                    {formData.tags || 'None'}
                   </span>
                 </div>
               </div>
@@ -617,6 +725,264 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
         )}
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Design Section
+// ============================================================================
+
+interface DesignSectionProps {
+  campaign: Campaign;
+  onSave: (data: Partial<CampaignFormData>) => void;
+  isSaving?: boolean;
+}
+
+function DesignSection({ campaign, onSave, isSaving }: DesignSectionProps) {
+  const editorRef = useRef<GrapesEditorRef>(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editorContent, setEditorContent] = useState<string | undefined>(undefined);
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+
+  const hasContent = !!campaign.content_html;
+
+  const handleTemplateSelect = useCallback(
+    (template: { id: number; content_html: string; content_json?: string } | null) => {
+      if (template) {
+        // Use JSON if available, otherwise HTML
+        setEditorContent(template.content_json || template.content_html);
+      } else {
+        // Blank
+        setEditorContent(undefined);
+      }
+      setShowEditor(true);
+    },
+    []
+  );
+
+  const handleEditDesign = useCallback(() => {
+    // Load existing campaign content into editor
+    const json = campaign.content_json;
+    if (json && typeof json === 'object' && Object.keys(json).length > 0) {
+      setEditorContent(JSON.stringify(json));
+    } else {
+      setEditorContent(campaign.content_html || undefined);
+    }
+    setShowEditor(true);
+  }, [campaign]);
+
+  const handleSaveDesign = useCallback(() => {
+    if (!editorRef.current) return;
+    const content_html = editorRef.current.getHtml();
+    const content_json = editorRef.current.getJson();
+    onSave({ content_html, content_json } as unknown as Partial<CampaignFormData>);
+    toast.success('Design saved');
+  }, [onSave]);
+
+  // Editor is open
+  if (showEditor) {
+    return (
+      <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-3">
+        {/* Toolbar row */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowEditor(false)}
+          >
+            Back to preview
+          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSaveAsTemplateOpen(true)}
+            >
+              <BookmarkPlus className="w-3.5 h-3.5 mr-1.5" />
+              Save as Template
+            </Button>
+            <Button
+              className="bg-tw-blue hover:bg-tw-blue-dark"
+              size="sm"
+              onClick={handleSaveDesign}
+              disabled={isSaving}
+            >
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              {isSaving ? 'Saving...' : 'Save Design'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Editor */}
+        <div style={{ minHeight: 600 }}>
+          <GrapesEditor
+            ref={editorRef}
+            initialContent={editorContent}
+            onSave={handleSaveDesign}
+            saving={isSaving}
+          />
+        </div>
+
+        {/* Save as Template dialog */}
+        <SaveAsTemplateDialog
+          open={saveAsTemplateOpen}
+          onOpenChange={setSaveAsTemplateOpen}
+          editorRef={editorRef}
+        />
+      </div>
+    );
+  }
+
+  // Has existing content — show preview
+  if (hasContent) {
+    return (
+      <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5 space-y-4">
+        <div className="border border-card-border rounded-lg overflow-hidden" style={{ maxHeight: 300 }}>
+          <iframe
+            srcDoc={campaign.content_html || ''}
+            title="Email preview"
+            className="w-full border-0"
+            style={{ height: 300 }}
+            sandbox="allow-same-origin"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleEditDesign}>
+            Edit Design
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+            Change Template
+          </Button>
+        </div>
+        <TemplatePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleTemplateSelect}
+        />
+      </div>
+    );
+  }
+
+  // No content — initial state
+  return (
+    <div className="mt-2 bg-card border border-card-border rounded-[14px] p-5">
+      <div className="text-center py-10">
+        <Palette className="w-8 h-8 text-text-muted mx-auto mb-3" />
+        <p className="text-sm text-text-secondary mb-1">Select a template or start from blank</p>
+        <p className="text-xs text-text-muted mb-4">Design your email using the drag-and-drop editor.</p>
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
+            Choose Template
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setEditorContent(undefined);
+              setShowEditor(true);
+            }}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Start from Blank
+          </Button>
+        </div>
+      </div>
+      <TemplatePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={handleTemplateSelect}
+      />
+    </div>
+  );
+}
+
+// ============================================================================
+// Save as Template Dialog
+// ============================================================================
+
+interface SaveAsTemplateDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editorRef: React.RefObject<GrapesEditorRef | null>;
+}
+
+function SaveAsTemplateDialog({ open, onOpenChange, editorRef }: SaveAsTemplateDialogProps) {
+  const [templateName, setTemplateName] = useState('');
+  const [category, setCategory] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (!editorRef.current || !templateName.trim()) return;
+    setSaving(true);
+    try {
+      const content_html = editorRef.current.getHtml();
+      const content_json = editorRef.current.getJson();
+      await api.post('/templates', {
+        name: templateName.trim(),
+        category: category.trim() || undefined,
+        content_html,
+        content_json,
+      });
+      toast.success('Template saved');
+      setTemplateName('');
+      setCategory('');
+      onOpenChange(false);
+    } catch {
+      toast.error('Failed to save template');
+    } finally {
+      setSaving(false);
+    }
+  }, [editorRef, templateName, category, onOpenChange]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Save as Template</DialogTitle>
+          <DialogDescription>Save the current design as a reusable template.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 mt-2">
+          <div>
+            <Label htmlFor="template-name" className="text-xs text-text-muted mb-1">
+              Template Name
+            </Label>
+            <Input
+              id="template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. Monthly Newsletter"
+              autoFocus
+            />
+          </div>
+          <div>
+            <Label htmlFor="template-category" className="text-xs text-text-muted mb-1">
+              Category (optional)
+            </Label>
+            <Input
+              id="template-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Newsletters"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-tw-blue hover:bg-tw-blue-dark"
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !templateName.trim()}
+            >
+              {saving ? 'Saving...' : 'Save Template'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

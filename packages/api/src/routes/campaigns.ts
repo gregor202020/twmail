@@ -34,6 +34,15 @@ const createSchema = z.object({
   ab_test_config: z.record(z.unknown()).optional().nullable(),
   resend_enabled: z.boolean().optional(),
   resend_config: z.record(z.unknown()).optional().nullable(),
+  tags: z.string().max(1000).optional().nullable(),
+  utm_enabled: z.boolean().optional(),
+  utm_source: z.string().max(255).optional().nullable(),
+  utm_medium: z.string().max(255).optional().nullable(),
+  utm_campaign: z.string().max(255).optional().nullable(),
+  utm_content: z.string().max(255).optional().nullable(),
+  ga_tracking: z.boolean().optional(),
+  tracking_domain: z.string().max(255).optional().nullable(),
+  send_time_optimization: z.boolean().optional(),
 });
 
 const updateSchema = createSchema.partial();

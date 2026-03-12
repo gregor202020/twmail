@@ -209,6 +209,15 @@ export interface CampaignsTable {
   ab_test_config: Record<string, unknown> | null;
   resend_enabled: Generated<boolean>;
   resend_config: Record<string, unknown> | null;
+  tags: ColumnType<string | null, string | null, string | null>;
+  utm_enabled: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  utm_source: ColumnType<string | null, string | null, string | null>;
+  utm_medium: ColumnType<string | null, string | null, string | null>;
+  utm_campaign: ColumnType<string | null, string | null, string | null>;
+  utm_content: ColumnType<string | null, string | null, string | null>;
+  ga_tracking: ColumnType<boolean, boolean | undefined, boolean | undefined>;
+  tracking_domain: ColumnType<string | null, string | null, string | null>;
+  send_time_optimization: ColumnType<boolean, boolean | undefined, boolean | undefined>;
   resend_of: number | null;
   total_sent: Generated<number>;
   total_delivered: Generated<number>;
