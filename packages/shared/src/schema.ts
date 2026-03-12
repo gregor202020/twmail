@@ -467,6 +467,7 @@ export interface SettingsTable {
   default_sender_email: Generated<string>;
   default_sender_name: Generated<string>;
   timezone: Generated<string>;
+  physical_address: Generated<string>; // empty string = not configured (CAN-SPAM COMP-06)
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
