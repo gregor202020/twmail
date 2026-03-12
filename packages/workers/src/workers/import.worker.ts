@@ -74,11 +74,22 @@ export function createImportWorker(): Worker {
             // Check if contact exists
             const existing = await db
               .selectFrom('contacts')
-              .select(['id', 'custom_fields'])
+              .select(['id', 'status', 'custom_fields'])
               .where('email', '=', email)
               .executeTakeFirst();
 
             if (existing) {
+              // COMP-07: Never re-subscribe suppressed contacts via import
+              const isSuppressed = (
+                existing.status === ContactStatus.BOUNCED ||
+                existing.status === ContactStatus.COMPLAINED ||
+                existing.status === ContactStatus.UNSUBSCRIBED
+              );
+              if (isSuppressed) {
+                skipped++;
+                continue;
+              }
+
               if (!updateExisting) {
                 skipped++;
                 continue;
