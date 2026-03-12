@@ -25,6 +25,23 @@ export function createAbEvalWorker(): Worker {
         return { error: 'not_enough_variants' };
       }
 
+      // DATA-04: Minimum sample size guard
+      const campaign = await db
+        .selectFrom('campaigns')
+        .select('ab_test_config')
+        .where('id', '=', campaignId)
+        .executeTakeFirst();
+
+      const abConfig = (campaign?.ab_test_config ?? {}) as {
+        min_sample_size?: number;
+      };
+      const minSampleSize = abConfig.min_sample_size ?? 100;
+
+      const totalSent = variants.reduce((sum, v) => sum + (v.total_sent ?? 0), 0);
+      if (totalSent < minSampleSize) {
+        return { skipped: true, reason: 'insufficient_sample', total_sent: totalSent, min_required: minSampleSize };
+      }
+
       // Calculate Bayesian win probabilities
       const winProbs = calculateBayesianWinProbability(variants);
 
@@ -37,16 +54,15 @@ export function createAbEvalWorker(): Worker {
           .execute();
       }
 
-      // Determine winner: >95% win probability or highest absolute metric
-      let winnerIdx = 0;
-      let maxProb = 0;
-      for (let i = 0; i < winProbs.length; i++) {
-        if (winProbs[i]! > maxProb) {
-          maxProb = winProbs[i]!;
-          winnerIdx = i;
-        }
+      // DATA-04: Require 95% win probability before declaring winner
+      const WIN_PROBABILITY_THRESHOLD = 0.95;
+      const maxProb = Math.max(...winProbs);
+
+      if (maxProb < WIN_PROBABILITY_THRESHOLD) {
+        return { skipped: true, reason: 'no_confident_winner', probabilities: winProbs };
       }
 
+      const winnerIdx = winProbs.indexOf(maxProb);
       const winner = variants[winnerIdx]!;
 
       // Mark winner
@@ -100,7 +116,7 @@ export function createAbEvalWorker(): Worker {
 }
 
 // Bayesian win probability using Beta distribution sampling
-function calculateBayesianWinProbability(variants: CampaignVariant[]): number[] {
+export function calculateBayesianWinProbability(variants: CampaignVariant[]): number[] {
   const samples = 10000;
   const winCounts = new Array(variants.length).fill(0);
 
