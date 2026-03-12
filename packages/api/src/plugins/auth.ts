@@ -133,7 +133,7 @@ async function authenticateApiKey(request: import('fastify').FastifyRequest, tok
         .set({ last_used_at: new Date() })
         .where('id', '=', key.id)
         .execute()
-        .catch(() => {});
+        .catch((err) => { console.warn('Failed to update API key last_used_at', { err, keyId: key.id }); });
 
       return;
     }

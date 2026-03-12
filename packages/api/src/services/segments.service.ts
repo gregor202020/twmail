@@ -140,7 +140,7 @@ export async function getSegmentContacts(
     .set({ cached_count: total, cached_at: new Date() })
     .where('id', '=', segmentId)
     .execute()
-    .catch(() => {});
+    .catch((err) => { console.warn('Failed to update segment contacts cache', { err, segmentId }); });
 
   return {
     data: contacts,
@@ -213,7 +213,7 @@ export async function getSegmentCount(segmentId: number): Promise<{ count: numbe
     .set({ cached_count: count, cached_at: new Date() })
     .where('id', '=', segmentId)
     .execute()
-    .catch(() => {});
+    .catch((err) => { console.warn('Failed to update segment count cache', { err, segmentId }); });
 
   return { count };
 }
