@@ -19,7 +19,7 @@ created: 2026-03-13
 |----------|-------|
 | **Framework** | vitest + grep-based verification |
 | **Config file** | packages/api/vitest.config.ts |
-| **Quick run command** | `cd packages/api && npx vitest run tests/observability.test.ts` |
+| **Quick run command** | `cd packages/api && npx vitest run tests/sentry-init.unit.test.ts tests/pino-redact.unit.test.ts` |
 | **Full suite command** | `cd packages/api && npx vitest run` |
 | **Estimated runtime** | ~5 seconds |
 
@@ -38,9 +38,9 @@ created: 2026-03-13
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 11-01-01 | 01 | 1 | OBS-01 | grep | `grep -q "Sentry.init" packages/api/src/instrument.mjs packages/workers/src/instrument.mjs` | N/A | ⬜ pending |
-| 11-01-02 | 01 | 1 | OBS-02 | unit | `cd packages/api && npx vitest run tests/observability.test.ts` | ❌ W0 | ⬜ pending |
-| 11-01-03 | 01 | 1 | OBS-03 | grep | `! grep -rn "pino-pretty" packages/api/package.json packages/workers/package.json` | N/A | ⬜ pending |
+| 11-01-01 | 01 | 1 | OBS-01 | unit | `cd packages/api && npx vitest run tests/sentry-init.unit.test.ts tests/pino-redact.unit.test.ts` | ❌ W0 | ⬜ pending |
+| 11-01-02 | 01 | 1 | OBS-02, OBS-03 | grep | `grep -rn "console\.(log\|error\|warn)" packages/workers/src/ && echo "FAIL" \|\| echo "PASS"` | N/A | ⬜ pending |
+| 11-02-01 | 02 | 1 | OBS-01 | grep | `grep -q "withSentryConfig" packages/frontend/next.config.ts && grep -q "captureException" packages/frontend/src/app/global-error.tsx` | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
