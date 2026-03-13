@@ -70,12 +70,12 @@ Requirements for production-ready launch. Each maps to roadmap phases.
 ### Operational Readiness
 
 - [ ] **OPS-01**: Campaign state machine recovers correctly after worker crash (not stuck in SENDING)
-- [ ] **OPS-02**: SES rate limit respected under bulk send (worker concurrency ≤ 40/sec)
+- [x] **OPS-02**: SES rate limit respected under bulk send (worker concurrency ≤ 40/sec)
 - [ ] **OPS-03**: Scheduled campaign timezone conversion correct (stored as UTC, evaluated correctly)
 - [ ] **OPS-04**: MJML output valid across all editor block combinations
 - [ ] **OPS-05**: Image URLs in email output are absolute, not relative
-- [ ] **OPS-06**: Webhook HMAC uses constant-time comparison
-- [ ] **OPS-07**: Webhook endpoint auto-disable after 50 failures works correctly
+- [x] **OPS-06**: Webhook HMAC uses constant-time comparison
+- [x] **OPS-07**: Webhook endpoint auto-disable after 50 failures works correctly
 
 ### Observability
 
@@ -170,12 +170,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-09 | Phase 8 | Complete |
 | QUAL-10 | Phase 7 | Complete |
 | OPS-01 | Phase 9 | Pending |
-| OPS-02 | Phase 9 | Pending |
+| OPS-02 | Phase 9 | Complete |
 | OPS-03 | Phase 9 | Pending |
 | OPS-04 | Phase 10 | Pending |
 | OPS-05 | Phase 10 | Pending |
-| OPS-06 | Phase 9 | Pending |
-| OPS-07 | Phase 9 | Pending |
+| OPS-06 | Phase 9 | Complete |
+| OPS-07 | Phase 9 | Complete |
 | OBS-01 | Phase 11 | Pending |
 | OBS-02 | Phase 11 | Pending |
 | OBS-03 | Phase 11 | Pending |

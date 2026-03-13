@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-code-quality-strictness-08-02-PLAN.md
-last_updated: "2026-03-13T02:23:32.020Z"
+stopped_at: Completed 09-operational-readiness-09-01-PLAN.md
+last_updated: "2026-03-13T02:48:23.978Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
   total_phases: 12
-  completed_phases: 7
-  total_plans: 17
-  completed_plans: 16
+  completed_phases: 8
+  total_plans: 19
+  completed_plans: 18
 ---
 
 ---
@@ -95,6 +95,8 @@ Progress: [██████░░░░] 65%
 | Phase 07-code-quality-tooling P02 | 9 | 2 tasks | 6 files |
 | Phase 08-code-quality-strictness P02 | 25 | 1 tasks | 2 files |
 | Phase 08-code-quality-strictness P01 | 120 | 2 tasks | 24 files |
+| Phase 09-operational-readiness P01 | 268 | 2 tasks | 6 files |
+| Phase 09-operational-readiness P02 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -143,6 +145,9 @@ Recent decisions affecting current work:
 - [Phase 08-01]: Expression<SqlBool> as common return type for buildRuleFilter/buildSingleRule/buildJsonbRule covering both ExpressionWrapper and RawBuilder
 - [Phase 08-01]: redis as unknown as ConnectionOptions established pattern for all BullMQ connections — ioredis structural compatibility without any cast
 - [Phase 08-01]: Fastify plugin async functions suppress require-await per-function with eslint-disable-next-line — plugin type requires async signature
+- [Phase 09-01]: enqueueWebhookDelivery creates ephemeral Queue per call and calls queue.close() after add — consistent with bulk-send resend path
+- [Phase 09-01]: verifyHmacSignature returns false on length mismatch instead of throwing — timingSafeEqual requires equal-length buffers
+- [Phase 09-01]: source-code scan strategy used for rate limiter and auto-disable tests — avoids Redis/DB setup while guaranteeing config thresholds
 
 ### Pending Todos
 
@@ -158,6 +163,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T02:00:05.628Z
-Stopped at: Completed 08-code-quality-strictness-08-02-PLAN.md
+Last session: 2026-03-13T02:48:05.369Z
+Stopped at: Completed 09-operational-readiness-09-01-PLAN.md
 Resume file: None

@@ -18,7 +18,7 @@ Third Wave Mail is a feature-complete email marketing platform undergoing a prod
 - [x] **Phase 6: Infrastructure & Security** - Harden Redis, CORS, PgBouncer, BullMQ, and shutdown behavior (completed 2026-03-13)
 - [x] **Phase 7: Code Quality — Tooling** - Install ESLint, Prettier, Vitest, and pre-commit hooks (completed 2026-03-13)
 - [x] **Phase 8: Code Quality — Strictness** - TypeScript strict mode, consistent error shapes (completed 2026-03-13)
-- [ ] **Phase 9: Operational Readiness** - Campaign state recovery, rate limiting, scheduling, and webhooks
+- [x] **Phase 9: Operational Readiness** - Campaign state recovery, rate limiting, scheduling, and webhooks (completed 2026-03-13)
 - [ ] **Phase 10: Email Output** - Validate MJML output and enforce absolute image URLs
 - [ ] **Phase 11: Observability** - Sentry, structured logging with PII redaction
 - [ ] **Phase 12: Production Launch** - SES DNS verification, uptime monitoring, deploy readiness
@@ -149,7 +149,7 @@ Plans:
   3. A campaign scheduled in a non-UTC timezone sends at the correct local time after UTC storage and conversion
   4. Webhook HMAC signatures use a constant-time comparison that does not leak timing information
   5. A webhook endpoint that has failed 50 consecutive times is automatically disabled
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 09-01-PLAN.md — Fix webhook queue wiring, add HMAC utility, verify rate limiter (OPS-02, OPS-06, OPS-07)
 - [ ] 09-02-PLAN.md — Add SENDING stall recovery to scheduler, verify timezone conversion (OPS-01, OPS-03)
@@ -203,7 +203,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 6. Infrastructure & Security | 2/2 | Complete   | 2026-03-13 |
 | 7. Code Quality — Tooling | 2/2 | Complete   | 2026-03-13 |
 | 8. Code Quality — Strictness | 2/2 | Complete   | 2026-03-13 |
-| 9. Operational Readiness | 0/2 | Not started | - |
+| 9. Operational Readiness | 2/2 | Complete   | 2026-03-13 |
 | 10. Email Output | 0/TBD | Not started | - |
 | 11. Observability | 0/TBD | Not started | - |
 | 12. Production Launch | 0/TBD | Not started | - |
