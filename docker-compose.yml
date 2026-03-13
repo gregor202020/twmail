@@ -155,6 +155,8 @@ services:
     environment:
       - API_URL=http://api:3000
       - NODE_ENV=production
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
     depends_on:
       - api
     networks:
