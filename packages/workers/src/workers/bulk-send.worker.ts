@@ -1,9 +1,11 @@
-import { Worker, Queue, type Job } from 'bullmq';
+import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, CampaignStatus, ContactStatus, MessageStatus, EventType, resolveSegmentContactIds } from '@twmail/shared';
 import type { Contact, Campaign } from '@twmail/shared';
 import { sendEmail } from '../ses-client.js';
 import { processMergeTags } from '../merge-tags.js';
 import { injectTrackingPixel, rewriteLinks, getUnsubscribeHeaders } from '../tracking.js';
+
+const SES_CONFIG_SET = process.env['SES_CONFIGURATION_SET'] ?? 'marketing';
 
 // BUG-04: Atomic decrement-and-check via Lua script
 // Only one concurrent worker will receive shouldComplete === 1
@@ -144,7 +146,7 @@ export function createBulkSendWorker(): Worker {
         const headers = getUnsubscribeHeaders(messageId);
 
         // Set SES configuration set header
-        headers['X-SES-CONFIGURATION-SET'] = 'marketing';
+        headers['X-SES-CONFIGURATION-SET'] = SES_CONFIG_SET;
 
         // Send via SES
         const fromAddress = campaign.from_name
@@ -157,7 +159,7 @@ export function createBulkSendWorker(): Worker {
           subject,
           html,
           replyTo: campaign.reply_to ?? undefined,
-          configurationSet: 'marketing',
+          configurationSet: SES_CONFIG_SET,
           headers,
           messageId,
         });
@@ -217,7 +219,7 @@ export function createBulkSendWorker(): Worker {
           if (updatedCampaign?.resend_enabled && updatedCampaign?.resend_config) {
             const config = updatedCampaign.resend_config as { wait_hours?: number };
             const waitHours = config.wait_hours ?? 72;
-            const resendQueue = new Queue('resend', { connection: redis as any });
+            const resendQueue = new Queue('resend', { connection: redis as unknown as ConnectionOptions });
             await resendQueue.add('evaluate', { campaignId }, { delay: waitHours * 3600 * 1000 });
             await resendQueue.close();
           }
@@ -251,7 +253,7 @@ export function createBulkSendWorker(): Worker {
       }
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 25,
       limiter: {
         max: 40,
@@ -327,7 +329,7 @@ export function createCampaignSendWorker(): Worker {
       }
 
       // Handle A/B test variant assignment
-      const bulkSendQueue = new Queue('bulk-send', { connection: redis as any });
+      const bulkSendQueue = new Queue('bulk-send', { connection: redis as unknown as ConnectionOptions });
 
       if (campaign.ab_test_enabled && campaign.ab_test_config) {
         const abConfig = campaign.ab_test_config as {
@@ -371,7 +373,7 @@ export function createCampaignSendWorker(): Worker {
           }
 
           // Set Redis counter for A/B path (only test contacts are enqueued)
-          await redis.set(`twmail:remaining:${campaignId}`, testContacts.length);
+          await redis.set(`twmail:remaining:${campaignId}`, testContacts.length, 'EX', 604800);
 
           // BUG-03: Persist holdback to PostgreSQL (survives Redis restart/eviction)
           if (holdbackContacts.length > 0) {
@@ -386,7 +388,7 @@ export function createCampaignSendWorker(): Worker {
 
             // Schedule A/B evaluation job
             const waitHours = abConfig.winner_wait_hours ?? 4;
-            const abEvalQueue = new Queue('ab-eval', { connection: redis as any });
+            const abEvalQueue = new Queue('ab-eval', { connection: redis as unknown as ConnectionOptions });
             await abEvalQueue.add(
               'evaluate',
               { campaignId },
@@ -397,7 +399,7 @@ export function createCampaignSendWorker(): Worker {
         }
       } else {
         // Set Redis counter for standard path (all contacts are enqueued)
-        await redis.set(`twmail:remaining:${campaignId}`, contactIds.length);
+        await redis.set(`twmail:remaining:${campaignId}`, contactIds.length, 'EX', 604800);
 
         // Standard send: enqueue all contacts
         for (const contactId of contactIds) {
@@ -410,7 +412,7 @@ export function createCampaignSendWorker(): Worker {
       return { queued: contactIds.length };
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 5,
     },
   );
