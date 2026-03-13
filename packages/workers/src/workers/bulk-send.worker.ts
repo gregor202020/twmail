@@ -14,6 +14,7 @@ import { sendEmail } from '../ses-client.js';
 import { processMergeTags } from '../merge-tags.js';
 import { injectTrackingPixel, rewriteLinks, getUnsubscribeHeaders } from '../tracking.js';
 import { assertAbsoluteUrls, isMjmlSource } from '../email-output.js';
+import { logger } from '../logger.js';
 
 const SES_CONFIG_SET = process.env['SES_CONFIGURATION_SET'] ?? 'marketing';
 
@@ -117,7 +118,7 @@ export function createBulkSendWorker(): Worker {
 
       // OPS-04: Defensive guard — reject uncompiled MJML source
       if (isMjmlSource(html)) {
-        console.error('OPS-04: Received uncompiled MJML source in bulk-send worker', { campaignId });
+        logger.error({ campaignId }, 'OPS-04: Received uncompiled MJML source in bulk-send worker');
         return { skipped: true, reason: 'uncompiled_mjml' };
       }
 
@@ -265,11 +266,7 @@ export function createBulkSendWorker(): Worker {
                 .execute();
             }
           } catch (finallyErr) {
-            console.error('Failed to decrement counter in finally block', {
-              err: finallyErr,
-              campaignId,
-              contactId,
-            });
+            logger.error({ err: finallyErr, campaignId, contactId }, 'Failed to decrement counter in finally block');
           }
         }
       }
@@ -286,16 +283,14 @@ export function createBulkSendWorker(): Worker {
 
   worker.on('failed', (job, err) => {
     const data = job?.data;
-    console.error('Bulk send job failed', {
-      jobId: job?.id,
-      campaignId: data?.campaignId,
-      contactId: data?.contactId,
-      error: err.message,
-    });
+    logger.error(
+      { jobId: job?.id, campaignId: data?.campaignId, contactId: data?.contactId, err },
+      'Bulk send job failed',
+    );
   });
 
   worker.on('error', (err) => {
-    console.error('Bulk send worker error:', err);
+    logger.error({ err }, 'Bulk send worker error');
   });
 
   return worker;
@@ -432,7 +427,7 @@ export function createCampaignSendWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    console.error(`Campaign send job ${job?.id} failed:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'Campaign send job failed');
   });
 
   return worker;

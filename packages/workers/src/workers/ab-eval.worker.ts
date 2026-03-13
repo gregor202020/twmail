@@ -1,6 +1,7 @@
 import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis } from '@twmail/shared';
 import type { CampaignVariant } from '@twmail/shared';
+import { logger } from '../logger.js';
 
 export interface AbEvalJobData {
   campaignId: number;
@@ -102,7 +103,7 @@ export function createAbEvalWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    console.error(`A/B eval job ${job?.id} failed:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'A/B eval job failed');
   });
 
   return worker;

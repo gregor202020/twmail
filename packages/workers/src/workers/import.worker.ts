@@ -1,5 +1,6 @@
 import { Worker, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, ContactStatus, ImportStatus } from '@twmail/shared';
+import { logger } from '../logger.js';
 
 export interface ImportJobData {
   importId: number;
@@ -200,7 +201,7 @@ export function createImportWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    console.error(`Import job ${job?.id} failed:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'Import job failed');
   });
 
   return worker;

@@ -1,6 +1,7 @@
 import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, WebhookDeliveryStatus } from '@twmail/shared';
 import { createHmac } from 'crypto';
+import { logger } from '../logger.js';
 
 export interface WebhookJobData {
   deliveryId: number;
@@ -150,7 +151,7 @@ export function createWebhookWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    console.error(`Webhook delivery job ${job?.id} failed:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'Webhook delivery job failed');
   });
 
   return worker;

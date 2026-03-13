@@ -1,5 +1,6 @@
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, CampaignStatus } from '@twmail/shared';
+import { logger } from './logger.js';
 
 /** Campaigns stuck in SENDING longer than this are re-enqueued by the scheduler. */
 export const STALE_SENDING_THRESHOLD_MS = 10 * 60 * 1000; // 600_000 ms = 10 minutes
@@ -45,7 +46,7 @@ export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queu
 
         if (result) {
           await campaignSendQueue.add('send', { campaignId: campaign.id });
-          console.log(`Scheduler: campaign ${campaign.id} transitioned SCHEDULED -> SENDING`);
+          logger.info({ campaignId: campaign.id }, 'Scheduler: campaign transitioned SCHEDULED -> SENDING');
         }
       }
 
@@ -60,10 +61,10 @@ export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queu
 
       for (const campaign of stuck) {
         await campaignSendQueue.add('send', { campaignId: campaign.id });
-        console.log(`Scheduler: re-enqueued stuck campaign ${campaign.id} (SENDING > 10min)`);
+        logger.warn({ campaignId: campaign.id }, 'Scheduler: re-enqueued stuck campaign (SENDING > 10min)');
       }
     } catch (err) {
-      console.error('Scheduler poll error:', err);
+      logger.error({ err }, 'Scheduler poll error');
     }
   };
 
@@ -71,7 +72,7 @@ export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queu
   await poll();
   const interval = setInterval(() => void poll(), 60_000);
 
-  console.log('Scheduler: polling every 60s for SCHEDULED campaigns');
+  logger.info('Scheduler: polling every 60s for SCHEDULED campaigns');
 
   return { interval, queue: campaignSendQueue };
 }

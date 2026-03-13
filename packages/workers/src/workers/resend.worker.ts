@@ -1,5 +1,6 @@
 import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, CampaignStatus, ContactStatus } from '@twmail/shared';
+import { logger } from '../logger.js';
 
 export interface ResendJobData {
   campaignId: number;
@@ -119,7 +120,7 @@ export function createResendWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    console.error(`Resend job ${job?.id} failed:`, err.message);
+    logger.error({ jobId: job?.id, err }, 'Resend job failed');
   });
 
   return worker;
