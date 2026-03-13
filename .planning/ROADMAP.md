@@ -149,9 +149,10 @@ Plans:
   3. A campaign scheduled in a non-UTC timezone sends at the correct local time after UTC storage and conversion
   4. Webhook HMAC signatures use a constant-time comparison that does not leak timing information
   5. A webhook endpoint that has failed 50 consecutive times is automatically disabled
-**Plans:** TBD
+**Plans:** 2 plans
 Plans:
-- TBD
+- [ ] 09-01-PLAN.md — Fix webhook queue wiring, add HMAC utility, verify rate limiter (OPS-02, OPS-06, OPS-07)
+- [ ] 09-02-PLAN.md — Add SENDING stall recovery to scheduler, verify timezone conversion (OPS-01, OPS-03)
 
 ### Phase 10: Email Output
 **Goal**: Every email rendered by the platform is valid HTML and contains only absolute URLs
@@ -202,7 +203,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 6. Infrastructure & Security | 2/2 | Complete   | 2026-03-13 |
 | 7. Code Quality — Tooling | 2/2 | Complete   | 2026-03-13 |
 | 8. Code Quality — Strictness | 2/2 | Complete   | 2026-03-13 |
-| 9. Operational Readiness | 0/TBD | Not started | - |
+| 9. Operational Readiness | 0/2 | Not started | - |
 | 10. Email Output | 0/TBD | Not started | - |
 | 11. Observability | 0/TBD | Not started | - |
 | 12. Production Launch | 0/TBD | Not started | - |
