@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-code-quality-tooling-07-01-PLAN.md
-last_updated: "2026-03-13T01:21:39.721Z"
+stopped_at: Completed 07-code-quality-tooling-07-02-PLAN.md
+last_updated: "2026-03-13T01:23:26.002Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
   total_phases: 12
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 91
 ---
 
@@ -77,6 +77,7 @@ Progress: [██████░░░░] 65%
 | Phase 06-infrastructure-security P02 | 12 | 2 tasks | 6 files |
 | Phase 06-infrastructure-security P01 | 15 | 2 tasks | 3 files |
 | Phase 07-code-quality-tooling P01 | 25 | 2 tasks | 45 files |
+| Phase 07-code-quality-tooling P02 | 9 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,9 @@ Recent decisions affecting current work:
 - [Phase 07-code-quality-tooling]: no-misused-promises added as error alongside no-floating-promises; unsafe-* rules downgraded to warn for Phase 8
 - [Phase 07-code-quality-tooling]: void operator used for process.on and setInterval async callbacks — fire-and-forget pattern preserved correctly
 - [Phase 07-code-quality-tooling]: lint-staged --max-warnings=0 enforces zero warnings in staged files while allowing existing warnings in unstaged code
+- [Phase 07-02]: processBounceSnsEvent uses ON CONFLICT (message_id, event_type) not (sns_message_id) — events table has no sns_message_id column; idempotency key is (message, event_type) pair
+- [Phase 07-02]: Segment unit tests use Kysely DummyDriver + PostgresAdapter for compile() — no real DB connection required, SQL structure verified via string assertions
+- [Phase 07-02]: shouldSkipSend refactored out of bulk-send worker to accept db as parameter for mock injection in unit tests
 
 ### Pending Todos
 
@@ -130,6 +134,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T01:21:39.718Z
-Stopped at: Completed 07-code-quality-tooling-07-01-PLAN.md
+Last session: 2026-03-13T01:23:25.999Z
+Stopped at: Completed 07-code-quality-tooling-07-02-PLAN.md
 Resume file: None
