@@ -44,13 +44,13 @@ Requirements for production-ready launch. Each maps to roadmap phases.
 ### Infrastructure & Security
 
 - [ ] **INFRA-01**: Redis maxmemory-policy set to noeviction (not allkeys-lru)
-- [ ] **INFRA-02**: CORS origin changed from wildcard (origin: true) to explicit allowlist
+- [x] **INFRA-02**: CORS origin changed from wildcard (origin: true) to explicit allowlist
 - [ ] **INFRA-03**: PgBouncer pool sizing matches application pool demands (fix 60 vs 40 mismatch)
 - [ ] **INFRA-04**: BullMQ worker IORedis clients have maxRetriesPerRequest: null
-- [ ] **INFRA-05**: Graceful shutdown (SIGTERM/SIGINT) for Fastify and all worker processes
-- [ ] **INFRA-06**: Health endpoint unauthenticated and returns 200 with DB+Redis check
+- [x] **INFRA-05**: Graceful shutdown (SIGTERM/SIGINT) for Fastify and all worker processes
+- [x] **INFRA-06**: Health endpoint unauthenticated and returns 200 with DB+Redis check
 - [ ] **INFRA-07**: Redis AOF persistence with appendfsync everysec
-- [ ] **INFRA-08**: @fastify/helmet added for security headers
+- [x] **INFRA-08**: @fastify/helmet added for security headers
 - [ ] **INFRA-09**: Redis counter TTL set and atomic decrement-and-check for campaign completion
 - [ ] **INFRA-10**: SES configuration set 'marketing' verified or made configurable via env var
 
@@ -150,13 +150,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-10 | Phase 5 | Complete |
 | DATA-11 | Phase 5 | Complete |
 | INFRA-01 | Phase 6 | Pending |
-| INFRA-02 | Phase 6 | Pending |
+| INFRA-02 | Phase 6 | Complete |
 | INFRA-03 | Phase 6 | Pending |
 | INFRA-04 | Phase 6 | Pending |
-| INFRA-05 | Phase 6 | Pending |
-| INFRA-06 | Phase 6 | Pending |
+| INFRA-05 | Phase 6 | Complete |
+| INFRA-06 | Phase 6 | Complete |
 | INFRA-07 | Phase 6 | Pending |
-| INFRA-08 | Phase 6 | Pending |
+| INFRA-08 | Phase 6 | Complete |
 | INFRA-09 | Phase 6 | Pending |
 | INFRA-10 | Phase 6 | Pending |
 | QUAL-01 | Phase 7 | Pending |

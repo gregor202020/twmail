@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-data-integrity-tracking-segments-05-02-PLAN.md
-last_updated: "2026-03-13T00:15:47.155Z"
+stopped_at: Completed 06-infrastructure-security-06-02-PLAN.md
+last_updated: "2026-03-13T00:36:27.203Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
   total_phases: 12
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 10
+  total_plans: 13
+  completed_plans: 11
   percent: 91
 ---
 
@@ -74,6 +74,7 @@ Progress: [██████░░░░] 65%
 | Phase 04-data-integrity-error-handling P01 | 3 | 2 tasks | 3 files |
 | Phase 05-data-integrity-tracking-segments P01 | 15 | 1 task | 2 files |
 | Phase 05-data-integrity-tracking-segments P02 | 5 | 2 tasks | 4 files |
+| Phase 06-infrastructure-security P02 | 12 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - [Phase 05-02]: resolveSegmentContactIds placed in @twmail/shared — workers package has no api dependency; shared is importable by both packages
 - [Phase 05-02]: within_days operator semantics: column >= (now - N*86400000ms), meaning contacts active within last N days
 - [Phase 05-02]: between operator uses two-element array [low, high] matching existing SegmentRule.value type union
+- [Phase 06-02]: CORS origin callback checks !origin first (SNS webhooks have no Origin header and must pass before allowlist check)
+- [Phase 06-02]: helmet registered with contentSecurityPolicy disabled (pure API, CSP would interfere with tracking pixel)
+- [Phase 06-02]: ALLOWED_ORIGINS defaults to empty string — empty means all origins blocked, safe default for production
 
 ### Pending Todos
 
@@ -118,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T00:11:10.678Z
-Stopped at: Completed 05-data-integrity-tracking-segments-05-02-PLAN.md
+Last session: 2026-03-13T00:36:27.194Z
+Stopped at: Completed 06-infrastructure-security-06-02-PLAN.md
 Resume file: None
