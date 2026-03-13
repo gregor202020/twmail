@@ -101,23 +101,24 @@ async function checkDkim(domain: string, tokens: string[]): Promise<boolean> {
     return false;
   }
 
-  let allOk = true;
-  for (const token of tokens) {
-    const cname = `${token}._domainkey.${domain}`;
-    try {
-      const results = await dns.promises.resolveCname(cname);
-      if (results.length > 0) {
-        pass(`DKIM CNAME ${token}`, results[0]);
-      } else {
+  const results = await Promise.all(
+    tokens.map(async (token) => {
+      const cname = `${token}._domainkey.${domain}`;
+      try {
+        const records = await dns.promises.resolveCname(cname);
+        if (records.length > 0) {
+          pass(`DKIM CNAME ${token}`, records[0]);
+          return true;
+        }
         fail(`DKIM CNAME ${token}`, 'no records');
-        allOk = false;
+        return false;
+      } catch {
+        fail(`DKIM CNAME ${token}`, 'not found');
+        return false;
       }
-    } catch {
-      fail(`DKIM CNAME ${token}`, 'not found');
-      allOk = false;
-    }
-  }
-  return allOk;
+    }),
+  );
+  return results.every(Boolean);
 }
 
 async function checkDmarc(domain: string): Promise<boolean> {
@@ -133,7 +134,7 @@ async function checkDmarc(domain: string): Promise<boolean> {
 
     const dmarc = flat[0]!;
     // Extract the p= policy value
-    const policyMatch = dmarc.match(/;\s*p=([\w]+)/i) ?? dmarc.match(/^v=DMARC1;\s*p=([\w]+)/i);
+    const policyMatch = dmarc.match(/[;\s]p=([\w]+)/i);
     const policy = policyMatch?.[1]?.toLowerCase();
 
     if (policy === 'quarantine' || policy === 'reject') {
@@ -166,16 +167,15 @@ async function main(): Promise<void> {
 
   const ses = new SESv2Client({ region });
 
-  const results: boolean[] = [];
-
   const identity = await checkSesIdentity(ses, domain);
-  results.push(identity.ok);
 
-  results.push(await checkSpf(domain));
-  results.push(await checkDkim(domain, identity.dkimTokens));
-  results.push(await checkDmarc(domain));
+  const [spfOk, dkimOk, dmarcOk] = await Promise.all([
+    checkSpf(domain),
+    checkDkim(domain, identity.dkimTokens),
+    checkDmarc(domain),
+  ]);
 
-  const allPassed = results.every(Boolean);
+  const allPassed = identity.ok && spfOk && dkimOk && dmarcOk;
 
   console.log(`\n${BOLD}${'='.repeat(40)}${RESET}`);
   if (allPassed) {
