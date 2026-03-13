@@ -134,9 +134,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. All packages compile with strict: true and no suppressed type errors in service or worker code
   2. Every API error response conforms to { error: { code, message } } — no route returns a different shape
-**Plans:** TBD
+**Plans:** 2 plans
 Plans:
-- TBD
+- [ ] 08-01-PLAN.md — Remove all as-any casts, fix compile errors, upgrade ESLint strict-type rules to error (QUAL-08)
+- [ ] 08-02-PLAN.md — Fix non-conforming error sends in webhooks-inbound.ts + error shape test (QUAL-09)
 
 ### Phase 9: Operational Readiness
 **Goal**: The system recovers from failures and respects operational constraints
@@ -200,7 +201,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. Data Integrity — Tracking & Segments | 2/2 | Complete   | 2026-03-13 |
 | 6. Infrastructure & Security | 2/2 | Complete   | 2026-03-13 |
 | 7. Code Quality — Tooling | 2/2 | Complete   | 2026-03-13 |
-| 8. Code Quality — Strictness | 0/TBD | Not started | - |
+| 8. Code Quality — Strictness | 0/2 | Not started | - |
 | 9. Operational Readiness | 0/TBD | Not started | - |
 | 10. Email Output | 0/TBD | Not started | - |
 | 11. Observability | 0/TBD | Not started | - |
