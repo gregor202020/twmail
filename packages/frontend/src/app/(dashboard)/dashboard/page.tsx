@@ -74,7 +74,7 @@ export default function DashboardPage() {
                 <BarChartWidget
                   title="Send Volume"
                   subtitle="Last 7 days"
-                  data={data?.daily_sends?.map((d: DailySend) => ({ label: d.day, value: d.count })) ?? []}
+                  data={data?.daily_sends?.map((d: DailySend) => ({ label: d.day, value: d.count ?? 0 })) ?? []}
                 />
               )}
             </div>
@@ -89,7 +89,7 @@ export default function DashboardPage() {
                       <CampaignStatusDot status={c.status} />
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate group-hover:text-tw-blue transition-colors">{c.name}</div>
-                        <div className="text-[10px] text-text-muted">{c.total_sent ? `${formatPercent(c.open_rate)} opened` : 'Draft'}</div>
+                        <div className="text-[10px] text-text-muted">{c.total_sent ? `${formatPercent(c.open_rate ?? 0)} opened` : 'Draft'}</div>
                       </div>
                       <span className="text-[10px] text-text-muted">{timeAgo(c.created_at)}</span>
                     </Link>
