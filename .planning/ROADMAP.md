@@ -17,7 +17,7 @@ Third Wave Mail is a feature-complete email marketing platform undergoing a prod
 - [x] **Phase 5: Data Integrity — Tracking & Segments** - Fix click tracking, segment logic, and count accuracy (completed 2026-03-13)
 - [x] **Phase 6: Infrastructure & Security** - Harden Redis, CORS, PgBouncer, BullMQ, and shutdown behavior (completed 2026-03-13)
 - [x] **Phase 7: Code Quality — Tooling** - Install ESLint, Prettier, Vitest, and pre-commit hooks (completed 2026-03-13)
-- [ ] **Phase 8: Code Quality — Strictness** - TypeScript strict mode, consistent error shapes
+- [x] **Phase 8: Code Quality — Strictness** - TypeScript strict mode, consistent error shapes (completed 2026-03-13)
 - [ ] **Phase 9: Operational Readiness** - Campaign state recovery, rate limiting, scheduling, and webhooks
 - [ ] **Phase 10: Email Output** - Validate MJML output and enforce absolute image URLs
 - [ ] **Phase 11: Observability** - Sentry, structured logging with PII redaction
@@ -134,7 +134,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. All packages compile with strict: true and no suppressed type errors in service or worker code
   2. Every API error response conforms to { error: { code, message } } — no route returns a different shape
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 08-01-PLAN.md — Remove all as-any casts, fix compile errors, upgrade ESLint strict-type rules to error (QUAL-08)
 - [ ] 08-02-PLAN.md — Fix non-conforming error sends in webhooks-inbound.ts + error shape test (QUAL-09)
@@ -201,7 +201,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. Data Integrity — Tracking & Segments | 2/2 | Complete   | 2026-03-13 |
 | 6. Infrastructure & Security | 2/2 | Complete   | 2026-03-13 |
 | 7. Code Quality — Tooling | 2/2 | Complete   | 2026-03-13 |
-| 8. Code Quality — Strictness | 0/2 | Not started | - |
+| 8. Code Quality — Strictness | 2/2 | Complete   | 2026-03-13 |
 | 9. Operational Readiness | 0/TBD | Not started | - |
 | 10. Email Output | 0/TBD | Not started | - |
 | 11. Observability | 0/TBD | Not started | - |

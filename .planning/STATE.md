@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 08-code-quality-strictness-08-02-PLAN.md
+stopped_at: Completed 08-code-quality-strictness-08-01-PLAN.md
 last_updated: "2026-03-13T02:00:05.631Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
@@ -79,6 +79,7 @@ Progress: [██████░░░░] 65%
 | Phase 07-code-quality-tooling P01 | 25 | 2 tasks | 45 files |
 | Phase 07-code-quality-tooling P02 | 9 | 2 tasks | 6 files |
 | Phase 08-code-quality-strictness P02 | 25 | 1 tasks | 2 files |
+| Phase 08-code-quality-strictness P01 | 120 | 2 tasks | 24 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,10 @@ Recent decisions affecting current work:
 - [Phase 08-02]: SNS webhook errors use inline reply.send with { error: { code, message } } — no AppError throw, SNS callers ignore error bodies
 - [Phase 08-02]: Error shape regression test uses source-code scan (fs.readFileSync) — no DB or HTTP required, fastest guard
 - [Phase 08-02]: INVALID_SNS_SIGNATURE, INVALID_SUBSCRIBE_URL, INVALID_SNS_MESSAGE used as inline error codes in SCREAMING_SNAKE_CASE
+- [Phase 08-01]: sql<SqlBool> template literals with sql.ref() for heterogeneous column comparisons — Kysely eb() operator calls reject RawBuilder as value
+- [Phase 08-01]: Expression<SqlBool> as common return type for buildRuleFilter/buildSingleRule/buildJsonbRule covering both ExpressionWrapper and RawBuilder
+- [Phase 08-01]: redis as unknown as ConnectionOptions established pattern for all BullMQ connections — ioredis structural compatibility without any cast
+- [Phase 08-01]: Fastify plugin async functions suppress require-await per-function with eslint-disable-next-line — plugin type requires async signature
 
 ### Pending Todos
 
