@@ -87,7 +87,7 @@ export async function listMappingPresets(): Promise<Record<string, Record<string
   const presets = await redis.hgetall('twmail:mapping-presets');
   const result: Record<string, Record<string, string>> = {};
   for (const [name, json] of Object.entries(presets)) {
-    result[name] = JSON.parse(json);
+    result[name] = JSON.parse(json) as Record<string, string>;
   }
   return result;
 }

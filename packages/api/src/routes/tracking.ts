@@ -1,5 +1,7 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { getDb, ContactStatus, EventType, MessageStatus } from '@twmail/shared';
+import type { Kysely } from 'kysely';
+import type { Database } from '@twmail/shared';
 
 // 1x1 transparent PNG pixel
 const TRACKING_PIXEL = Buffer.from(
@@ -22,6 +24,7 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export const trackingRoutes: FastifyPluginAsync = async (app) => {
   // GET /t/o/:messageId.png — Open tracking pixel
   app.get<{ Params: { messageId: string } }>(
@@ -144,7 +147,7 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
   );
 };
 
-async function recordOpen(db: any, messageId: string, request: any): Promise<void> {
+async function recordOpen(db: Kysely<Database>, messageId: string, request: FastifyRequest): Promise<void> {
   const message = await db
     .selectFrom('messages')
     .select(['contact_id', 'campaign_id', 'variant_id'])
@@ -154,7 +157,7 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
   if (!message) return;
 
   const ip = request.ip ?? '';
-  const userAgent = request.headers['user-agent'] ?? '';
+  const userAgent = String(request.headers['user-agent'] ?? '');
   const isMachine = detectMachineOpen(ip, userAgent);
 
   const eventType = isMachine ? EventType.MACHINE_OPEN : EventType.OPEN;
@@ -184,7 +187,7 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
     // Update campaign counters
     await db
       .updateTable('campaigns')
-      .set((eb: any) => ({
+      .set((eb) => ({
         total_opens: eb('total_opens', '+', 1),
         total_human_opens: eb('total_human_opens', '+', 1),
       }))
@@ -195,7 +198,7 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
     if (message.variant_id) {
       await db
         .updateTable('campaign_variants')
-        .set((eb: any) => ({
+        .set((eb) => ({
           total_opens: eb('total_opens', '+', 1),
           total_human_opens: eb('total_human_opens', '+', 1),
         }))
@@ -212,7 +215,7 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
   } else {
     await db
       .updateTable('campaigns')
-      .set((eb: any) => ({ total_opens: eb('total_opens', '+', 1) }))
+      .set((eb) => ({ total_opens: eb('total_opens', '+', 1) }))
       .where('id', '=', message.campaign_id)
       .execute();
 
@@ -220,7 +223,7 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
     if (message.variant_id) {
       await db
         .updateTable('campaign_variants')
-        .set((eb: any) => ({
+        .set((eb) => ({
           total_opens: eb('total_opens', '+', 1),
         }))
         .where('id', '=', message.variant_id)
@@ -231,7 +234,13 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
   }
 }
 
-async function recordClick(db: any, messageId: string, linkHash: string, url: string, request: any): Promise<void> {
+async function recordClick(
+  db: Kysely<Database>,
+  messageId: string,
+  linkHash: string,
+  url: string,
+  request: FastifyRequest,
+): Promise<void> {
   const message = await db
     .selectFrom('messages')
     .select(['contact_id', 'campaign_id', 'variant_id'])
@@ -240,7 +249,7 @@ async function recordClick(db: any, messageId: string, linkHash: string, url: st
 
   if (!message) return;
 
-  const userAgent = request.headers['user-agent'] ?? '';
+  const userAgent = String(request.headers['user-agent'] ?? '');
 
   await db
     .insertInto('events')
@@ -266,7 +275,7 @@ async function recordClick(db: any, messageId: string, linkHash: string, url: st
   // Update campaign counters
   await db
     .updateTable('campaigns')
-    .set((eb: any) => ({
+    .set((eb) => ({
       total_clicks: eb('total_clicks', '+', 1),
       total_human_clicks: eb('total_human_clicks', '+', 1),
     }))
@@ -277,7 +286,7 @@ async function recordClick(db: any, messageId: string, linkHash: string, url: st
   if (message.variant_id) {
     await db
       .updateTable('campaign_variants')
-      .set((eb: any) => ({
+      .set((eb) => ({
         total_clicks: eb('total_clicks', '+', 1),
         total_human_clicks: eb('total_human_clicks', '+', 1),
       }))

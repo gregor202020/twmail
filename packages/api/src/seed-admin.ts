@@ -74,7 +74,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('Seed failed:', err.message);
+main().catch((err: unknown) => {
+  console.error('Seed failed:', err instanceof Error ? err.message : String(err));
   process.exit(1);
 });
