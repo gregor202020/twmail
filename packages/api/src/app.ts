@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { getConfig } from './config.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
@@ -32,7 +33,25 @@ export async function buildApp() {
   });
 
   // Plugins
-  await app.register(cors, { origin: true, credentials: true });
+  const rawOrigins = config.ALLOWED_ORIGINS;
+  const allowedOrigins = new Set(
+    rawOrigins.split(',').map((o: string) => o.trim()).filter(Boolean)
+  );
+
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      // Allow requests with no origin (server-to-server: SNS webhooks, cron, curl)
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false, // Pure API — no HTML pages served; CSP would interfere with tracking pixel
+  });
+
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await app.register(errorHandlerPlugin);
   await app.register(authPlugin);
