@@ -22,6 +22,12 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "lint-staged": {
+    "packages/{api,workers,shared}/src/**/*.ts": [
+      "eslint --max-warnings=0",
+      "prettier --write"
+    ]
+  },
   "devDependencies": {
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
