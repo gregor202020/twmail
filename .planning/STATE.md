@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 09-operational-readiness-09-01-PLAN.md
-last_updated: "2026-03-13T02:48:23.978Z"
+stopped_at: Completed 09-operational-readiness-09-02-PLAN.md
+last_updated: "2026-03-13T02:48:44.309Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
   total_phases: 12
@@ -148,6 +148,9 @@ Recent decisions affecting current work:
 - [Phase 09-01]: enqueueWebhookDelivery creates ephemeral Queue per call and calls queue.close() after add — consistent with bulk-send resend path
 - [Phase 09-01]: verifyHmacSignature returns false on length mismatch instead of throwing — timingSafeEqual requires equal-length buffers
 - [Phase 09-01]: source-code scan strategy used for rate limiter and auto-disable tests — avoids Redis/DB setup while guaranteeing config thresholds
+- [Phase 09-operational-readiness]: [Phase 09-02]: SENDING stall recovery re-enqueues without status change — campaign-send worker resolves via shouldSkipSend dedup
+- [Phase 09-operational-readiness]: [Phase 09-02]: STALE_SENDING_THRESHOLD_MS = 600_000ms exported at module scope for testability
+- [Phase 09-operational-readiness]: [Phase 09-02]: Timezone conversion uses ECMA-262 Date constructor + Zod .datetime() — no Luxon needed
 
 ### Pending Todos
 
@@ -163,6 +166,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T02:48:05.369Z
-Stopped at: Completed 09-operational-readiness-09-01-PLAN.md
+Last session: 2026-03-13T02:48:44.306Z
+Stopped at: Completed 09-operational-readiness-09-02-PLAN.md
 Resume file: None
