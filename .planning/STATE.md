@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 11-observability-11-02-PLAN.md
-last_updated: "2026-03-13T05:15:48.179Z"
+stopped_at: Completed 11-observability-11-01-PLAN.md
+last_updated: "2026-03-13T05:25:38.383Z"
 last_activity: 2026-03-13 — Plan 05-01 complete (click redirect SENT event link_map fix + URL preservation tests)
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 ---
@@ -99,6 +99,7 @@ Progress: [██████░░░░] 65%
 | Phase 09-operational-readiness P02 | 6 | 2 tasks | 3 files |
 | Phase 10-email-output P01 | 356 | 2 tasks | 4 files |
 | Phase 11-observability P02 | 6 | 1 tasks | 8 files |
+| Phase 11-observability P01 | 14 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,10 @@ Recent decisions affecting current work:
 - [Phase 10-email-output]: isMjmlSource guard returns skipped result; assertAbsoluteUrls throws as hard guard for BullMQ job failure
 - [Phase 11-02]: NEXT_PUBLIC_SENTRY_DSN passed as Docker ARG before build step so it is baked into the client bundle at image build time
 - [Phase 11-02]: onRequestError = Sentry.captureRequestError re-exported directly — no wrapper needed for Next.js 15+ server error capture
+- [Phase 11-01]: instrument.mjs is plain ESM source copied to Docker image separately — --import loads it at container startup without TypeScript compilation
+- [Phase 11-01]: Sentry.setupFastifyErrorHandler registered before all plugins to catch plugin registration errors
+- [Phase 11-01]: Workers use standalone pino logger — no Fastify context; API routes still use request.log per Phase 04-01
+- [Phase 11-01]: SENTRY_DSN optional in config schema — logs warn in production if unset but does not crash startup
 
 ### Pending Todos
 
@@ -173,6 +178,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T05:15:48.174Z
-Stopped at: Completed 11-observability-11-02-PLAN.md
+Last session: 2026-03-13T05:25:38.372Z
+Stopped at: Completed 11-observability-11-01-PLAN.md
 Resume file: None

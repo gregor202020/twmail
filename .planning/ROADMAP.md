@@ -20,7 +20,7 @@ Third Wave Mail is a feature-complete email marketing platform undergoing a prod
 - [x] **Phase 8: Code Quality — Strictness** - TypeScript strict mode, consistent error shapes (completed 2026-03-13)
 - [x] **Phase 9: Operational Readiness** - Campaign state recovery, rate limiting, scheduling, and webhooks (completed 2026-03-13)
 - [x] **Phase 10: Email Output** - Validate MJML output and enforce absolute image URLs (completed 2026-03-13)
-- [ ] **Phase 11: Observability** - Sentry, structured logging with PII redaction
+- [x] **Phase 11: Observability** - Sentry, structured logging with PII redaction (completed 2026-03-13)
 - [ ] **Phase 12: Production Launch** - SES DNS verification, uptime monitoring, deploy readiness
 
 ## Phase Details
@@ -173,7 +173,7 @@ Plans:
   1. An unhandled exception in the API, any worker, or the frontend creates a Sentry event with full context
   2. Production log output is structured JSON with email addresses and JWT tokens redacted
   3. pino-pretty is absent from all production bundles and docker images
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 11-01-PLAN.md — Sentry + Pino redact for API and workers (OBS-01, OBS-02, OBS-03)
 - [ ] 11-02-PLAN.md — Sentry for Next.js frontend (OBS-01)
@@ -206,5 +206,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 8. Code Quality — Strictness | 2/2 | Complete   | 2026-03-13 |
 | 9. Operational Readiness | 2/2 | Complete   | 2026-03-13 |
 | 10. Email Output | 1/1 | Complete    | 2026-03-13 |
-| 11. Observability | 1/2 | In Progress|  |
+| 11. Observability | 2/2 | Complete   | 2026-03-13 |
 | 12. Production Launch | 0/TBD | Not started | - |
