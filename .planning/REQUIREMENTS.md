@@ -72,8 +72,8 @@ Requirements for production-ready launch. Each maps to roadmap phases.
 - [x] **OPS-01**: Campaign state machine recovers correctly after worker crash (not stuck in SENDING)
 - [x] **OPS-02**: SES rate limit respected under bulk send (worker concurrency ≤ 40/sec)
 - [x] **OPS-03**: Scheduled campaign timezone conversion correct (stored as UTC, evaluated correctly)
-- [ ] **OPS-04**: MJML output valid across all editor block combinations
-- [ ] **OPS-05**: Image URLs in email output are absolute, not relative
+- [x] **OPS-04**: MJML output valid across all editor block combinations
+- [x] **OPS-05**: Image URLs in email output are absolute, not relative
 - [x] **OPS-06**: Webhook HMAC uses constant-time comparison
 - [x] **OPS-07**: Webhook endpoint auto-disable after 50 failures works correctly
 
@@ -172,8 +172,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OPS-01 | Phase 9 | Complete |
 | OPS-02 | Phase 9 | Complete |
 | OPS-03 | Phase 9 | Complete |
-| OPS-04 | Phase 10 | Pending |
-| OPS-05 | Phase 10 | Pending |
+| OPS-04 | Phase 10 | Complete |
+| OPS-05 | Phase 10 | Complete |
 | OPS-06 | Phase 9 | Complete |
 | OPS-07 | Phase 9 | Complete |
 | OBS-01 | Phase 11 | Pending |

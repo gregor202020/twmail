@@ -19,7 +19,7 @@ Third Wave Mail is a feature-complete email marketing platform undergoing a prod
 - [x] **Phase 7: Code Quality — Tooling** - Install ESLint, Prettier, Vitest, and pre-commit hooks (completed 2026-03-13)
 - [x] **Phase 8: Code Quality — Strictness** - TypeScript strict mode, consistent error shapes (completed 2026-03-13)
 - [x] **Phase 9: Operational Readiness** - Campaign state recovery, rate limiting, scheduling, and webhooks (completed 2026-03-13)
-- [ ] **Phase 10: Email Output** - Validate MJML output and enforce absolute image URLs
+- [x] **Phase 10: Email Output** - Validate MJML output and enforce absolute image URLs (completed 2026-03-13)
 - [ ] **Phase 11: Observability** - Sentry, structured logging with PII redaction
 - [ ] **Phase 12: Production Launch** - SES DNS verification, uptime monitoring, deploy readiness
 
@@ -161,7 +161,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Every combination of GrapeJS editor blocks produces valid MJML output that renders without errors
   2. Every image src and link href in a sent email is an absolute URL (no relative paths)
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 10-01-PLAN.md — Fix MJML compilation in editor + add absolute URL and MJML source guards in worker (OPS-04, OPS-05)
 
@@ -204,6 +204,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. Code Quality — Tooling | 2/2 | Complete   | 2026-03-13 |
 | 8. Code Quality — Strictness | 2/2 | Complete   | 2026-03-13 |
 | 9. Operational Readiness | 2/2 | Complete   | 2026-03-13 |
-| 10. Email Output | 0/1 | Not started | - |
+| 10. Email Output | 1/1 | Complete   | 2026-03-13 |
 | 11. Observability | 0/TBD | Not started | - |
 | 12. Production Launch | 0/TBD | Not started | - |
