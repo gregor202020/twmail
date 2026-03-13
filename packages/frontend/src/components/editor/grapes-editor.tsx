@@ -38,7 +38,14 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     useImperativeHandle(ref, () => ({
       getHtml: () => {
         if (!editorRef.current) return '';
-        return editorRef.current.getHtml() + `<style>${editorRef.current.getCss()}</style>`;
+        const result = editorRef.current.runCommand('mjml-code-to-html') as {
+          html: string;
+          errors: Array<{ formattedMessage: string }>;
+        };
+        if (result.errors?.length > 0) {
+          console.warn('MJML compile warnings:', result.errors.map((e) => e.formattedMessage));
+        }
+        return result.html ?? '';
       },
       getJson: () => {
         if (!editorRef.current) return '{}';
@@ -94,14 +101,16 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       [initialContent]
     );
 
-    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const handleUpdate = useCallback(() => {
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (!editorRef.current || !onChange) return;
-        const html =
-          editorRef.current.getHtml() +
-          `<style>${editorRef.current.getCss()}</style>`;
+        const result = editorRef.current.runCommand('mjml-code-to-html') as {
+          html: string;
+          errors: Array<{ formattedMessage: string }>;
+        };
+        const html = result.html ?? '';
         const json = JSON.stringify(editorRef.current.getProjectData());
         onChange(html, json);
       }, 500);
