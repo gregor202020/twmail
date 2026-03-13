@@ -1,4 +1,4 @@
-import { Worker, type Job } from 'bullmq';
+import { Worker, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, ContactStatus, ImportStatus } from '@twmail/shared';
 
 export interface ImportJobData {
@@ -69,7 +69,8 @@ export function createImportWorker(): Worker {
               continue;
             }
 
-            const email = String(contact['email']).trim().toLowerCase();
+            const emailRaw = contact['email'];
+            const email = (typeof emailRaw === 'string' ? emailRaw : '').trim().toLowerCase();
 
             // Basic email validation
             if (!email.includes('@') || !email.includes('.')) {
@@ -103,7 +104,7 @@ export function createImportWorker(): Worker {
 
               // Merge custom fields
               const mergedCustom = {
-                ...(existing.custom_fields as Record<string, unknown>),
+                ...existing.custom_fields,
                 ...customFields,
               };
 
@@ -163,8 +164,8 @@ export function createImportWorker(): Worker {
 
               newContacts++;
             }
-          } catch (err: any) {
-            errors.push({ row: rowIdx, message: err.message ?? 'Unknown error' });
+          } catch (err: unknown) {
+            errors.push({ row: rowIdx, message: err instanceof Error ? err.message : 'Unknown error' });
             skipped++;
           }
         }
@@ -184,7 +185,7 @@ export function createImportWorker(): Worker {
           new_contacts: newContacts,
           updated_contacts: updatedContacts,
           skipped,
-          errors: errors.length > 0 ? (errors as any) : null,
+          errors: errors.length > 0 ? (errors as unknown as Record<string, unknown>) : null,
           completed_at: new Date(),
         })
         .where('id', '=', importId)
@@ -193,7 +194,7 @@ export function createImportWorker(): Worker {
       return { newContacts, updatedContacts, skipped, errorCount: errors.length };
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 3,
     },
   );

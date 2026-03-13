@@ -2,11 +2,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import { listAssets, getAsset, uploadAsset, deleteAsset } from '../services/assets.service.js';
 import { requireAuth } from '../middleware/auth.js';
 
+// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 export const assetRoutes: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', requireAuth);
 
   // POST /api/assets/upload
-  app.post('/upload', async (request, reply) => {
+  app.post<{ Querystring: { campaign_id?: string } }>('/upload', async (request, reply) => {
     const data = await request.file();
     if (!data) {
       return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'No file uploaded' } });
@@ -17,7 +18,7 @@ export const assetRoutes: FastifyPluginAsync = async (app) => {
       filename: data.filename,
       mimeType: data.mimetype,
       buffer,
-      campaignId: (request.query as any)?.campaign_id ? Number((request.query as any).campaign_id) : undefined,
+      campaignId: request.query.campaign_id ? Number(request.query.campaign_id) : undefined,
     });
 
     reply.status(201);

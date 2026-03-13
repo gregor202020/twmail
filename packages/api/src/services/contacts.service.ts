@@ -1,4 +1,4 @@
-import { getDb, ErrorCode, ContactStatus } from '@twmail/shared';
+import { getDb, ErrorCode } from '@twmail/shared';
 import type { PaginationParams, PaginatedResponse, Contact, NewContact, ContactUpdate } from '@twmail/shared';
 import { AppError } from '../plugins/error-handler.js';
 
@@ -43,12 +43,24 @@ export async function listContacts(
     );
   }
 
-  const sortBy = params.sort_by ?? 'created_at';
+  const ALLOWED_SORT_COLUMNS = new Set<keyof Contact>([
+    'email',
+    'status',
+    'first_name',
+    'last_name',
+    'company',
+    'engagement_score',
+    'last_open_at',
+    'last_click_at',
+    'created_at',
+    'updated_at',
+  ]);
+  const rawSort = params.sort_by ?? 'created_at';
+  const sortBy: keyof Contact = ALLOWED_SORT_COLUMNS.has(rawSort as keyof Contact)
+    ? (rawSort as keyof Contact)
+    : 'created_at';
   const sortOrder = params.sort_order ?? 'desc';
-  query = query
-    .orderBy(sortBy as any, sortOrder)
-    .limit(perPage)
-    .offset(offset);
+  query = query.orderBy(sortBy, sortOrder).limit(perPage).offset(offset);
 
   const [contacts, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
@@ -82,8 +94,8 @@ export async function createContact(data: NewContact): Promise<Contact> {
 
   try {
     return await db.insertInto('contacts').values(data).returningAll().executeTakeFirstOrThrow();
-  } catch (err: any) {
-    if (err.code === '23505') {
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === '23505') {
       throw new AppError(409, ErrorCode.CONFLICT, 'Contact with this email already exists');
     }
     throw err;

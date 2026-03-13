@@ -1,6 +1,5 @@
-import { Worker, Queue, type Job } from 'bullmq';
-import { getDb, getRedis, CampaignStatus, ContactStatus, EventType } from '@twmail/shared';
-import { sql } from 'kysely';
+import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
+import { getDb, getRedis, CampaignStatus, ContactStatus } from '@twmail/shared';
 
 export interface ResendJobData {
   campaignId: number;
@@ -102,7 +101,7 @@ export function createResendWorker(): Worker {
         .executeTakeFirstOrThrow();
 
       // Queue sends
-      const bulkSendQueue = new Queue('bulk-send', { connection: redis as any });
+      const bulkSendQueue = new Queue('bulk-send', { connection: redis as unknown as ConnectionOptions });
       for (const contactId of eligibleIds) {
         await bulkSendQueue.add('send', {
           contactId,
@@ -114,7 +113,7 @@ export function createResendWorker(): Worker {
       return { resendCampaignId: resendCampaign.id, queued: eligibleIds.length };
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 2,
     },
   );

@@ -2,8 +2,10 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { AppError } from '../plugins/error-handler.js';
 import { ErrorCode, UserRole } from '@twmail/shared';
 
-export async function requireAuth(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
-  await (request.server as any).authenticate(request);
+// reply is intentionally unused — Fastify preHandler hooks require this signature
+export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  void reply;
+  await request.server.authenticate(request);
 }
 
 export function requireRole(...roles: number[]) {

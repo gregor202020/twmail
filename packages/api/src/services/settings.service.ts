@@ -5,10 +5,10 @@ export async function getSettings() {
   const db = getDb();
   let row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirst();
   if (!row) {
-    // Ensure the singleton row exists
+    // Ensure the singleton row exists (id is Generated<number>, so explicit id=1 is valid)
     await db
       .insertInto('settings')
-      .values({ id: 1 } as any)
+      .values({ id: 1 })
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();
     row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirstOrThrow();

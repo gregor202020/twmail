@@ -1,4 +1,4 @@
-import { Worker, Queue, type Job } from 'bullmq';
+import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, WebhookDeliveryStatus } from '@twmail/shared';
 import { createHmac } from 'crypto';
 
@@ -17,7 +17,7 @@ const BACKOFF_DELAYS_MS = [30 * 1000, 2 * 60 * 1000, 8 * 60 * 1000, 32 * 60 * 10
 
 export function createWebhookWorker(): Worker {
   const redis = getRedis();
-  const webhookQueue = new Queue('webhook', { connection: redis as any });
+  const webhookQueue = new Queue('webhook', { connection: redis as unknown as ConnectionOptions });
 
   const worker = new Worker<WebhookJobData>(
     'webhook',
@@ -92,14 +92,14 @@ export function createWebhookWorker(): Worker {
           .execute();
 
         throw new Error(`Webhook returned ${response.status}`);
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Update delivery attempt count
         await db.updateTable('webhook_deliveries').set({ attempts: attempt }).where('id', '=', deliveryId).execute();
 
         // Increment endpoint failure count
         await db
           .updateTable('webhook_endpoints')
-          .set((eb: any) => ({ failure_count: eb('failure_count', '+', 1) }))
+          .set((eb) => ({ failure_count: eb('failure_count', '+', 1) }))
           .where('id', '=', endpointId)
           .execute();
 
@@ -121,7 +121,7 @@ export function createWebhookWorker(): Worker {
             .set({ status: WebhookDeliveryStatus.FAILED })
             .where('id', '=', deliveryId)
             .execute();
-          return { failed: true, error: err.message };
+          return { failed: true, error: err instanceof Error ? err.message : String(err) };
         }
 
         // Re-enqueue with exponential backoff delay
@@ -144,7 +144,7 @@ export function createWebhookWorker(): Worker {
       }
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 10,
     },
   );

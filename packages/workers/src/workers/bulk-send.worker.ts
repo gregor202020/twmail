@@ -8,8 +8,7 @@ import {
   EventType,
   resolveSegmentContactIds,
 } from '@twmail/shared';
-import type { Contact, Campaign } from '@twmail/shared';
-import type { Kysely } from 'kysely';
+import type { Kysely, ExpressionBuilder } from 'kysely';
 import type { Database } from '@twmail/shared';
 import { sendEmail } from '../ses-client.js';
 import { processMergeTags } from '../merge-tags.js';
@@ -36,7 +35,7 @@ const DECR_AND_CHECK_LUA = `
  * Exported for unit testing without a live database.
  */
 export async function shouldSkipSend(db: Kysely<Database>, campaignId: number, contactId: number): Promise<boolean> {
-  const existing = await (db as any)
+  const existing = await db
     .selectFrom('messages')
     .select(['id'])
     .where('campaign_id', '=', campaignId)
@@ -207,7 +206,7 @@ export function createBulkSendWorker(): Worker {
         // Increment campaign send counter (only on confirmed SES send)
         await db
           .updateTable('campaigns')
-          .set((eb: any) => ({ total_sent: eb('total_sent', '+', 1) }))
+          .set((eb: ExpressionBuilder<Database, 'campaigns'>) => ({ total_sent: eb('total_sent', '+', 1) }))
           .where('id', '=', campaignId)
           .execute();
 

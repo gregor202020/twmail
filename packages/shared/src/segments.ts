@@ -1,4 +1,4 @@
-import { sql, type ExpressionBuilder } from 'kysely';
+import { sql, type ExpressionBuilder, type Expression, type SqlBool } from 'kysely';
 import { getDb } from './db.js';
 import { ContactStatus, SegmentType } from './types.js';
 import type { Database } from './schema.js';
@@ -31,14 +31,16 @@ const ALLOWED_COLUMNS = new Set([
   'updated_at',
 ]);
 
-export function buildRuleFilter(group: SegmentRuleGroup): (eb: ExpressionBuilder<Database, 'contacts'>) => any {
+export function buildRuleFilter(
+  group: SegmentRuleGroup,
+): (eb: ExpressionBuilder<Database, 'contacts'>) => Expression<SqlBool> {
   return (eb: ExpressionBuilder<Database, 'contacts'>) => {
     const conditions = group.rules.map((rule) => {
       if ('logic' in rule) {
-        // Nested group
-        return buildRuleFilter(rule as SegmentRuleGroup)(eb);
+        // Nested group — TypeScript narrows to SegmentRuleGroup via 'logic' in rule
+        return buildRuleFilter(rule)(eb);
       }
-      return buildSingleRule(eb, rule as SegmentRule);
+      return buildSingleRule(eb, rule);
     });
 
     if (conditions.length === 0) {
@@ -52,7 +54,7 @@ export function buildRuleFilter(group: SegmentRuleGroup): (eb: ExpressionBuilder
   };
 }
 
-export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rule: SegmentRule): any {
+export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rule: SegmentRule): Expression<SqlBool> {
   const { field, operator, value } = rule;
 
   // Handle custom_fields with jsonb path
@@ -66,62 +68,70 @@ export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rul
     throw new Error(`Invalid segment rule field: ${field}`);
   }
 
-  const col = field as keyof Database['contacts'];
+  // Use sql template for all comparisons to avoid Kysely's heterogeneous column
+  // type-inference limitation (col is keyof Database['contacts'] — a union of all
+  // column names — so Kysely cannot narrow the expected value type at compile time).
+  // sql<SqlBool>`` returns Expression<SqlBool>, the correct return type.
+  const colRef = sql.ref(field);
 
   switch (operator) {
     case 'eq':
-      return eb(col, '=', value as any);
+      return sql<SqlBool>`${colRef} = ${sql.val(value)}`;
     case 'neq':
-      return eb(col, '!=', value as any);
+      return sql<SqlBool>`${colRef} != ${sql.val(value)}`;
     case 'gt':
-      return eb(col, '>', value as any);
+      return sql<SqlBool>`${colRef} > ${sql.val(value)}`;
     case 'gte':
-      return eb(col, '>=', value as any);
+      return sql<SqlBool>`${colRef} >= ${sql.val(value)}`;
     case 'lt':
-      return eb(col, '<', value as any);
+      return sql<SqlBool>`${colRef} < ${sql.val(value)}`;
     case 'lte':
-      return eb(col, '<=', value as any);
+      return sql<SqlBool>`${colRef} <= ${sql.val(value)}`;
     case 'contains':
-      return eb(col, 'ilike', `%${value}%`);
+      return sql<SqlBool>`${colRef} ILIKE ${sql.val(`%${String(value)}%`)}`;
     case 'not_contains':
-      return eb.not(eb(col, 'ilike', `%${value}%`));
+      return sql<SqlBool>`${colRef} NOT ILIKE ${sql.val(`%${String(value)}%`)}`;
     case 'starts_with':
-      return eb(col, 'ilike', `${value}%`);
+      return sql<SqlBool>`${colRef} ILIKE ${sql.val(`${String(value)}%`)}`;
     case 'ends_with':
-      return eb(col, 'ilike', `%${value}`);
+      return sql<SqlBool>`${colRef} ILIKE ${sql.val(`%${String(value)}`)}`;
     case 'is_set':
-      return eb(col, 'is not', null);
+      return sql<SqlBool>`${colRef} IS NOT NULL`;
     case 'is_not_set':
-      return eb(col, 'is', null);
-    case 'in':
-      return eb(col, 'in', value as any[]);
-    case 'not_in':
-      return eb.not(eb(col, 'in', value as any[]));
+      return sql<SqlBool>`${colRef} IS NULL`;
+    case 'in': {
+      const inValues = value as (string | number)[];
+      return eb(field as keyof Database['contacts'], 'in', inValues as unknown as string[]);
+    }
+    case 'not_in': {
+      const notInValues = value as (string | number)[];
+      return eb.not(eb(field as keyof Database['contacts'], 'in', notInValues as unknown as string[]));
+    }
     case 'before':
-      return eb(col, '<', new Date(value as string) as any);
+      return sql<SqlBool>`${colRef} < ${sql.val(new Date(value as string))}`;
     case 'after':
-      return eb(col, '>', new Date(value as string) as any);
+      return sql<SqlBool>`${colRef} > ${sql.val(new Date(value as string))}`;
     case 'between': {
       const [low, high] = value as [string | number, string | number];
-      return eb.and([eb(col, '>=', low as any), eb(col, '<=', high as any)]);
+      return sql<SqlBool>`${colRef} >= ${sql.val(low)} AND ${colRef} <= ${sql.val(high)}`;
     }
     case 'within_days': {
       // "within last N days" means column >= (now - N * 86400000ms)
       const days = Number(value);
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      return eb(col, '>=', cutoff as any);
+      return sql<SqlBool>`${colRef} >= ${sql.val(cutoff)}`;
     }
     default:
-      throw new Error(`Unsupported operator: ${operator}`);
+      throw new Error(`Unsupported operator: ${String(operator)}`);
   }
 }
 
 function buildJsonbRule(
-  eb: ExpressionBuilder<Database, 'contacts'>,
+  _eb: ExpressionBuilder<Database, 'contacts'>,
   path: string,
   operator: string,
   value: unknown,
-): any {
+): Expression<SqlBool> {
   switch (operator) {
     case 'eq':
       return sql`custom_fields->>${sql.lit(path)} = ${sql.lit(String(value))}`;

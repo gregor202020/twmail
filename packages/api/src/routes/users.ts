@@ -11,22 +11,20 @@ import {
   deleteUser,
 } from '../services/users.service.js';
 
+const VALID_ROLES: number[] = [UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER];
+
 const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(255),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.number().refine((r) => [UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER].includes(r as any), {
-    message: 'Invalid role',
-  }),
+  role: z.number().refine((r) => VALID_ROLES.includes(r), { message: 'Invalid role' }),
 });
 
 const updateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   role: z
     .number()
-    .refine((r) => [UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER].includes(r as any), {
-      message: 'Invalid role',
-    })
+    .refine((r) => VALID_ROLES.includes(r), { message: 'Invalid role' })
     .optional(),
 });
 
@@ -34,6 +32,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 export const userRoutes: FastifyPluginAsync = async (app) => {
   // All user management routes require admin
   app.addHook('preHandler', requireAdmin());

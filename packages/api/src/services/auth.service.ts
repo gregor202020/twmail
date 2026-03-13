@@ -99,7 +99,7 @@ function generateToken(
     role: user.role,
     type,
   };
-  return jwt.sign(payload as any, config.JWT_SECRET, { expiresIn } as jwt.SignOptions);
+  return jwt.sign(payload as object, config.JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
 
 export async function hashPassword(password: string): Promise<string> {

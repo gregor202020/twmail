@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyError } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 import { ErrorCode } from '@twmail/shared';
@@ -15,6 +15,7 @@ export class AppError extends Error {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 const plugin: FastifyPluginAsync = async (app) => {
   app.setErrorHandler((error, _request, reply) => {
     // Zod validation errors
@@ -44,11 +45,17 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
 
     // Fastify validation errors
-    const fastifyError = error as any;
+    const fastifyError = error as FastifyError;
     if (fastifyError.validation) {
-      const details = fastifyError.validation.map((v: any) => ({
-        field: v.instancePath || v.params?.missingProperty || 'unknown',
-        message: v.message || 'Invalid value',
+      const details = (
+        fastifyError.validation as Array<{
+          instancePath?: string;
+          params?: { missingProperty?: string };
+          message?: string;
+        }>
+      ).map((v) => ({
+        field: v.instancePath ?? v.params?.missingProperty ?? 'unknown',
+        message: v.message ?? 'Invalid value',
       }));
       return reply.status(400).send({
         error: {
@@ -60,7 +67,7 @@ const plugin: FastifyPluginAsync = async (app) => {
     }
 
     // Rate limit errors
-    if (fastifyError.statusCode === 429) {
+    if ((fastifyError as { statusCode?: number }).statusCode === 429) {
       return reply.status(429).send({
         error: {
           code: ErrorCode.RATE_LIMITED,

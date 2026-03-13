@@ -1,4 +1,4 @@
-import { Queue } from 'bullmq';
+import { Queue, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis, CampaignStatus } from '@twmail/shared';
 
 /**
@@ -14,7 +14,7 @@ import { getDb, getRedis, CampaignStatus } from '@twmail/shared';
 export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queue: Queue }> {
   const db = getDb();
   const redis = getRedis();
-  const campaignSendQueue = new Queue('campaign-send', { connection: redis as any });
+  const campaignSendQueue = new Queue('campaign-send', { connection: redis as unknown as ConnectionOptions });
 
   const poll = async () => {
     try {

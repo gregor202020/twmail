@@ -1,4 +1,4 @@
-import { Worker, Queue, type Job } from 'bullmq';
+import { Worker, Queue, type Job, type ConnectionOptions } from 'bullmq';
 import { getDb, getRedis } from '@twmail/shared';
 import type { CampaignVariant } from '@twmail/shared';
 
@@ -77,7 +77,7 @@ export function createAbEvalWorker(): Worker {
       const holdbackContactIds = holdbackRows.map((r) => r.contact_id);
 
       if (holdbackContactIds.length > 0) {
-        const bulkSendQueue = new Queue('bulk-send', { connection: redis as any });
+        const bulkSendQueue = new Queue('bulk-send', { connection: redis as unknown as ConnectionOptions });
 
         for (const contactId of holdbackContactIds) {
           await bulkSendQueue.add('send', {
@@ -96,7 +96,7 @@ export function createAbEvalWorker(): Worker {
       return { winnerId: winner.id, winProbability: maxProb };
     },
     {
-      connection: redis as any,
+      connection: redis as unknown as ConnectionOptions,
       concurrency: 2,
     },
   );

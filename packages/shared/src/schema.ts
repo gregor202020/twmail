@@ -15,6 +15,7 @@ export interface Database {
   templates: TemplatesTable;
   campaigns: CampaignsTable;
   campaign_variants: CampaignVariantsTable;
+  campaign_holdback_contacts: CampaignHoldbackContactsTable;
   events: EventsTable;
   campaign_stats_daily: CampaignStatsDailyTable;
   messages: MessagesTable;
@@ -264,6 +265,20 @@ export interface CampaignVariantsTable {
 export type CampaignVariant = Selectable<CampaignVariantsTable>;
 export type NewCampaignVariant = Insertable<CampaignVariantsTable>;
 export type CampaignVariantUpdate = Updateable<CampaignVariantsTable>;
+
+// ============================================================================
+// campaign_holdback_contacts
+// ============================================================================
+
+export interface CampaignHoldbackContactsTable {
+  id: Generated<number>;
+  campaign_id: number;
+  contact_id: number;
+  created_at: Generated<Date>;
+}
+
+export type CampaignHoldbackContact = Selectable<CampaignHoldbackContactsTable>;
+export type NewCampaignHoldbackContact = Insertable<CampaignHoldbackContactsTable>;
 
 // ============================================================================
 // events
