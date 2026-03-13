@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { getDb, ContactStatus, EventType, MessageStatus } from '@twmail/shared';
-import { sql } from 'kysely';
 
 // 1x1 transparent PNG pixel
 const TRACKING_PIXEL = Buffer.from(
@@ -54,47 +53,18 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
       const { messageId, linkHash } = request.params;
       const db = getDb();
 
-      // Look up the original URL from metadata
-      const event = await db
+      // DATA-09: Query SENT event link_map (idx_events_message covers message_id + event_type)
+      const sentEvent = await db
         .selectFrom('events')
         .select('metadata')
         .where('message_id', '=', messageId)
-        .where('event_type', '=', EventType.CLICK)
-        .where(sql`metadata->>'link_hash'`, '=', linkHash)
+        .where('event_type', '=', EventType.SENT)
         .executeTakeFirst();
 
-      let targetUrl = 'https://thirdwavebbq.com.au'; // fallback
+      // DATA-08: resolveClickUrl returns the verbatim original URL from link_map
+      const targetUrl = resolveClickUrl(sentEvent?.metadata, linkHash);
 
-      if (event?.metadata && typeof event.metadata === 'object' && 'url' in event.metadata) {
-        targetUrl = String(event.metadata.url);
-      } else {
-        // Check link_map stored when email was sent
-        const linkMap = await db
-          .selectFrom('events')
-          .select('metadata')
-          .where('message_id', '=', messageId)
-          .where('event_type', '=', EventType.SENT)
-          .executeTakeFirst();
-
-        if (linkMap?.metadata && typeof linkMap.metadata === 'object' && 'link_map' in linkMap.metadata) {
-          const map = linkMap.metadata.link_map as Record<string, string>;
-          if (map[linkHash]) {
-            targetUrl = map[linkHash];
-          }
-        }
-      }
-
-      // Validate redirect URL to prevent open redirect (block javascript:, data:, etc.)
-      try {
-        const parsed = new URL(targetUrl);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          targetUrl = 'https://thirdwavebbq.com.au'; // fallback for unsafe protocols
-        }
-      } catch {
-        targetUrl = 'https://thirdwavebbq.com.au'; // fallback for malformed URLs
-      }
-
-      // Record click event async
+      // Record click event async (write-only audit trail — not used for URL resolution)
       recordClick(db, messageId, linkHash, targetUrl, request).catch((err) => { request.log.error({ err, messageId, linkHash }, 'recordClick failed'); });
 
       return reply.redirect(targetUrl);
@@ -330,6 +300,53 @@ async function recordClick(
     .set({ last_click_at: new Date(), last_activity_at: new Date() })
     .where('id', '=', message.contact_id)
     .execute();
+}
+
+const CLICK_FALLBACK_URL = 'https://thirdwavebbq.com.au';
+
+/**
+ * Resolves a redirect URL from a SENT event's metadata link_map.
+ *
+ * DATA-09: The SENT event link_map is the canonical URL source — written atomically
+ * at send time. This function is the sole URL resolution path; CLICK event metadata
+ * is write-only audit data and must not be used for URL lookups.
+ *
+ * DATA-08: The URL is returned verbatim (no re-encoding) to preserve UTM parameters
+ * and percent-encoded query strings exactly as the sender intended.
+ *
+ * @param sentMetadata - The `metadata` object from the SENT event row, or nullish if not found
+ * @param linkHash - The SHA-256 hash identifying the link within the link_map
+ * @returns The original URL string, or the site fallback URL if not resolvable / unsafe
+ */
+export function resolveClickUrl(sentMetadata: unknown, linkHash: string): string {
+  let targetUrl = CLICK_FALLBACK_URL;
+
+  if (
+    sentMetadata != null &&
+    typeof sentMetadata === 'object' &&
+    'link_map' in sentMetadata
+  ) {
+    const map = (sentMetadata as Record<string, unknown>)['link_map'];
+    if (map != null && typeof map === 'object' && linkHash in map) {
+      const candidate = (map as Record<string, unknown>)[linkHash];
+      if (typeof candidate === 'string') {
+        targetUrl = candidate;
+      }
+    }
+  }
+
+  // Validate protocol to prevent open redirect (block javascript:, data:, etc.)
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return CLICK_FALLBACK_URL;
+    }
+  } catch {
+    return CLICK_FALLBACK_URL;
+  }
+
+  // Return the raw string — NOT url.href — to avoid double-encoding percent chars
+  return targetUrl;
 }
 
 export function detectMachineOpen(ip: string, userAgent: string): boolean {
