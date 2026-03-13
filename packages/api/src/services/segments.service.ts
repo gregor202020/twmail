@@ -13,21 +13,13 @@ import { AppError } from '../plugins/error-handler.js';
 
 export async function listSegments() {
   const db = getDb();
-  return db
-    .selectFrom('segments')
-    .selectAll()
-    .orderBy('created_at', 'desc')
-    .execute();
+  return db.selectFrom('segments').selectAll().orderBy('created_at', 'desc').execute();
 }
 
 export async function getSegment(id: number): Promise<Segment> {
   const db = getDb();
 
-  const segment = await db
-    .selectFrom('segments')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const segment = await db.selectFrom('segments').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!segment) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Segment not found');
@@ -62,12 +54,7 @@ export async function updateSegment(
 ): Promise<Segment> {
   const db = getDb();
 
-  const result = await db
-    .updateTable('segments')
-    .set(data)
-    .where('id', '=', id)
-    .returningAll()
-    .executeTakeFirst();
+  const result = await db.updateTable('segments').set(data).where('id', '=', id).returningAll().executeTakeFirst();
 
   if (!result) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Segment not found');
@@ -79,10 +66,7 @@ export async function updateSegment(
 export async function deleteSegment(id: number): Promise<void> {
   const db = getDb();
 
-  const result = await db
-    .deleteFrom('segments')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('segments').where('id', '=', id).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Segment not found');
@@ -111,10 +95,7 @@ export async function getSegmentContacts(
 
   const ruleGroup = segment.rules as unknown as SegmentRuleGroup;
 
-  let query = db
-    .selectFrom('contacts')
-    .selectAll()
-    .where('status', '=', ContactStatus.ACTIVE);
+  let query = db.selectFrom('contacts').selectAll().where('status', '=', ContactStatus.ACTIVE);
 
   let countQuery = db
     .selectFrom('contacts')
@@ -128,10 +109,7 @@ export async function getSegmentContacts(
 
   query = query.orderBy('created_at', 'desc').limit(perPage).offset(offset);
 
-  const [contacts, countResult] = await Promise.all([
-    query.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [contacts, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 
@@ -140,7 +118,9 @@ export async function getSegmentContacts(
     .set({ cached_count: total, cached_at: new Date() })
     .where('id', '=', segmentId)
     .execute()
-    .catch((err) => { console.warn('Failed to update segment contacts cache', { err, segmentId }); });
+    .catch((err) => {
+      console.warn('Failed to update segment contacts cache', { err, segmentId });
+    });
 
   return {
     data: contacts,
@@ -213,7 +193,9 @@ export async function getSegmentCount(segmentId: number): Promise<{ count: numbe
     .set({ cached_count: count, cached_at: new Date() })
     .where('id', '=', segmentId)
     .execute()
-    .catch((err) => { console.warn('Failed to update segment count cache', { err, segmentId }); });
+    .catch((err) => {
+      console.warn('Failed to update segment count cache', { err, segmentId });
+    });
 
   return { count };
 }
@@ -303,15 +285,28 @@ export async function resolveSegmentContactIds(segmentId: number): Promise<numbe
 
 // Contact table columns that can be filtered on
 const ALLOWED_COLUMNS = new Set([
-  'email', 'status', 'first_name', 'last_name', 'phone', 'company',
-  'city', 'country', 'timezone', 'source', 'engagement_score',
-  'engagement_tier', 'last_open_at', 'last_click_at', 'last_activity_at',
-  'subscribed_at', 'unsubscribed_at', 'created_at', 'updated_at',
+  'email',
+  'status',
+  'first_name',
+  'last_name',
+  'phone',
+  'company',
+  'city',
+  'country',
+  'timezone',
+  'source',
+  'engagement_score',
+  'engagement_tier',
+  'last_open_at',
+  'last_click_at',
+  'last_activity_at',
+  'subscribed_at',
+  'unsubscribed_at',
+  'created_at',
+  'updated_at',
 ]);
 
-function buildRuleFilter(
-  group: SegmentRuleGroup,
-): (eb: ExpressionBuilder<Database, 'contacts'>) => any {
+function buildRuleFilter(group: SegmentRuleGroup): (eb: ExpressionBuilder<Database, 'contacts'>) => any {
   return (eb: ExpressionBuilder<Database, 'contacts'>) => {
     const conditions = group.rules.map((rule) => {
       if ('logic' in rule) {
@@ -332,10 +327,7 @@ function buildRuleFilter(
   };
 }
 
-function buildSingleRule(
-  eb: ExpressionBuilder<Database, 'contacts'>,
-  rule: SegmentRule,
-): any {
+function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rule: SegmentRule): any {
   const { field, operator, value } = rule;
 
   // Handle custom_fields with jsonb path

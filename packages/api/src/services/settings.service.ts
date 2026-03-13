@@ -6,7 +6,11 @@ export async function getSettings() {
   let row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirst();
   if (!row) {
     // Ensure the singleton row exists
-    await db.insertInto('settings').values({ id: 1 } as any).onConflict((oc) => oc.column('id').doNothing()).execute();
+    await db
+      .insertInto('settings')
+      .values({ id: 1 } as any)
+      .onConflict((oc) => oc.column('id').doNothing())
+      .execute();
     row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirstOrThrow();
   }
   return row;

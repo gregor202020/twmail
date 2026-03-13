@@ -13,13 +13,7 @@ export interface WebhookJobData {
 }
 
 // Exponential backoff delays: 30s, 2m, 8m, 32m, 2h
-const BACKOFF_DELAYS_MS = [
-  30 * 1000,
-  2 * 60 * 1000,
-  8 * 60 * 1000,
-  32 * 60 * 1000,
-  2 * 60 * 60 * 1000,
-];
+const BACKOFF_DELAYS_MS = [30 * 1000, 2 * 60 * 1000, 8 * 60 * 1000, 32 * 60 * 1000, 2 * 60 * 60 * 1000];
 
 export function createWebhookWorker(): Worker {
   const redis = getRedis();
@@ -40,8 +34,7 @@ export function createWebhookWorker(): Worker {
 
       if (
         existing &&
-        (existing.status === WebhookDeliveryStatus.DELIVERED ||
-          existing.status === WebhookDeliveryStatus.FAILED)
+        (existing.status === WebhookDeliveryStatus.DELIVERED || existing.status === WebhookDeliveryStatus.FAILED)
       ) {
         return { skipped: true, reason: 'already_processed' };
       }
@@ -101,11 +94,7 @@ export function createWebhookWorker(): Worker {
         throw new Error(`Webhook returned ${response.status}`);
       } catch (err: any) {
         // Update delivery attempt count
-        await db
-          .updateTable('webhook_deliveries')
-          .set({ attempts: attempt })
-          .where('id', '=', deliveryId)
-          .execute();
+        await db.updateTable('webhook_deliveries').set({ attempts: attempt }).where('id', '=', deliveryId).execute();
 
         // Increment endpoint failure count
         await db
@@ -122,11 +111,7 @@ export function createWebhookWorker(): Worker {
           .executeTakeFirst();
 
         if (endpoint && endpoint.failure_count >= 50) {
-          await db
-            .updateTable('webhook_endpoints')
-            .set({ active: false })
-            .where('id', '=', endpointId)
-            .execute();
+          await db.updateTable('webhook_endpoints').set({ active: false }).where('id', '=', endpointId).execute();
         }
 
         // Mark as failed after max retries (5 attempts)

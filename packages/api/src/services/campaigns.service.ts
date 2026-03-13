@@ -1,12 +1,6 @@
 import { getDb, getRedis, ErrorCode, CampaignStatus, ContactStatus } from '@twmail/shared';
 import { Queue } from 'bullmq';
-import type {
-  PaginationParams,
-  PaginatedResponse,
-  Campaign,
-  CampaignVariant,
-  Message,
-} from '@twmail/shared';
+import type { PaginationParams, PaginatedResponse, Campaign, CampaignVariant, Message } from '@twmail/shared';
 import { AppError } from '../plugins/error-handler.js';
 
 export async function listCampaigns(
@@ -27,10 +21,7 @@ export async function listCampaigns(
 
   query = query.orderBy('created_at', 'desc').limit(perPage).offset(offset);
 
-  const [campaigns, countResult] = await Promise.all([
-    query.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [campaigns, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 
@@ -43,11 +34,7 @@ export async function listCampaigns(
 export async function getCampaign(id: number): Promise<Campaign> {
   const db = getDb();
 
-  const campaign = await db
-    .selectFrom('campaigns')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const campaign = await db.selectFrom('campaigns').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!campaign) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Campaign not found');
@@ -125,12 +112,7 @@ export async function updateCampaign(
     throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only update draft campaigns');
   }
 
-  const result = await db
-    .updateTable('campaigns')
-    .set(data)
-    .where('id', '=', id)
-    .returningAll()
-    .executeTakeFirst();
+  const result = await db.updateTable('campaigns').set(data).where('id', '=', id).returningAll().executeTakeFirst();
 
   if (!result) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Campaign not found');
@@ -173,7 +155,11 @@ export async function sendCampaign(id: number): Promise<Campaign> {
   // COMP-06: Physical mailing address required (CAN-SPAM, CASL)
   const settings = await db.selectFrom('settings').select('physical_address').where('id', '=', 1).executeTakeFirst();
   if (!settings?.physical_address?.trim()) {
-    throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'A physical mailing address must be configured in Settings before sending campaigns');
+    throw new AppError(
+      400,
+      ErrorCode.VALIDATION_ERROR,
+      'A physical mailing address must be configured in Settings before sending campaigns',
+    );
   }
 
   // Update status to sending
@@ -249,7 +235,11 @@ export async function cancelCampaign(id: number): Promise<Campaign> {
   const db = getDb();
   const campaign = await getCampaign(id);
 
-  if (campaign.status !== CampaignStatus.SCHEDULED && campaign.status !== CampaignStatus.SENDING && campaign.status !== CampaignStatus.PAUSED) {
+  if (
+    campaign.status !== CampaignStatus.SCHEDULED &&
+    campaign.status !== CampaignStatus.SENDING &&
+    campaign.status !== CampaignStatus.PAUSED
+  ) {
     throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only cancel scheduled, sending, or paused campaigns');
   }
 
@@ -317,9 +307,10 @@ export async function getCampaignReport(id: number): Promise<{
     total_clicks: campaign.total_clicks,
     total_human_clicks: campaign.total_human_clicks,
     click_rate: Number(((campaign.total_human_clicks / delivered) * 100).toFixed(2)),
-    click_to_open_rate: campaign.total_human_opens > 0
-      ? Number(((campaign.total_human_clicks / campaign.total_human_opens) * 100).toFixed(2))
-      : 0,
+    click_to_open_rate:
+      campaign.total_human_opens > 0
+        ? Number(((campaign.total_human_clicks / campaign.total_human_opens) * 100).toFixed(2))
+        : 0,
     total_bounces: campaign.total_bounces,
     bounce_rate: Number(((campaign.total_bounces / (campaign.total_sent || 1)) * 100).toFixed(2)),
     total_complaints: campaign.total_complaints,
@@ -356,10 +347,7 @@ export async function getCampaignRecipients(
 
   query = query.orderBy('created_at', 'desc').limit(perPage).offset(offset);
 
-  const [messages, countResult] = await Promise.all([
-    query.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [messages, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 
@@ -416,11 +404,7 @@ export async function configureAbTest(
   }
 
   // Update campaign to enable A/B testing
-  await db
-    .updateTable('campaigns')
-    .set({ ab_test_enabled: true })
-    .where('id', '=', campaignId)
-    .execute();
+  await db.updateTable('campaigns').set({ ab_test_enabled: true }).where('id', '=', campaignId).execute();
 
   return results;
 }

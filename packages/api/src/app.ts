@@ -35,7 +35,10 @@ export async function buildApp() {
   // Plugins
   const rawOrigins = config.ALLOWED_ORIGINS;
   const allowedOrigins = new Set(
-    rawOrigins.split(',').map((o: string) => o.trim()).filter(Boolean)
+    rawOrigins
+      .split(',')
+      .map((o: string) => o.trim())
+      .filter(Boolean),
   );
 
   await app.register(cors, {

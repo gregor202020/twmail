@@ -25,15 +25,14 @@ export async function listUsers(params: PaginationParams = {}) {
   const offset = (page - 1) * perPage;
 
   const [users, countResult] = await Promise.all([
-    db.selectFrom('users')
+    db
+      .selectFrom('users')
       .select([...USER_FIELDS])
       .orderBy('created_at', 'desc')
       .limit(perPage)
       .offset(offset)
       .execute(),
-    db.selectFrom('users')
-      .select(db.fn.countAll().as('total'))
-      .executeTakeFirstOrThrow(),
+    db.selectFrom('users').select(db.fn.countAll().as('total')).executeTakeFirstOrThrow(),
   ]);
 
   const total = Number(countResult.total);
@@ -46,7 +45,8 @@ export async function listUsers(params: PaginationParams = {}) {
 
 export async function getUser(id: number) {
   const db = getDb();
-  const user = await db.selectFrom('users')
+  const user = await db
+    .selectFrom('users')
     .select([...USER_FIELDS])
     .where('id', '=', id)
     .executeTakeFirst();
@@ -60,7 +60,8 @@ export async function getUser(id: number) {
 export async function createUser(input: CreateUserInput) {
   const db = getDb();
 
-  const existing = await db.selectFrom('users')
+  const existing = await db
+    .selectFrom('users')
     .select('id')
     .where('email', '=', input.email.toLowerCase())
     .executeTakeFirst();
@@ -71,7 +72,8 @@ export async function createUser(input: CreateUserInput) {
 
   const passwordHash = await hashPassword(input.password);
 
-  const user = await db.insertInto('users')
+  const user = await db
+    .insertInto('users')
     .values({
       email: input.email.toLowerCase(),
       name: input.name,
@@ -87,7 +89,8 @@ export async function createUser(input: CreateUserInput) {
 export async function updateUser(id: number, input: UpdateUserInput) {
   const db = getDb();
 
-  const user = await db.updateTable('users')
+  const user = await db
+    .updateTable('users')
     .set({ ...input, updated_at: new Date() })
     .where('id', '=', id)
     .returning([...USER_FIELDS])
@@ -103,7 +106,8 @@ export async function resetUserPassword(id: number, newPassword: string) {
   const db = getDb();
   const passwordHash = await hashPassword(newPassword);
 
-  const user = await db.updateTable('users')
+  const user = await db
+    .updateTable('users')
     .set({ password_hash: passwordHash, updated_at: new Date() })
     .where('id', '=', id)
     .returning(['id'])
@@ -120,9 +124,7 @@ export async function deleteUser(id: number, requesterId: number) {
   }
 
   const db = getDb();
-  const result = await db.deleteFrom('users')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('users').where('id', '=', id).executeTakeFirst();
 
   if (Number(result.numDeletedRows) === 0) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'User not found');

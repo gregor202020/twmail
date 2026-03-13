@@ -45,12 +45,12 @@ export async function listContacts(
 
   const sortBy = params.sort_by ?? 'created_at';
   const sortOrder = params.sort_order ?? 'desc';
-  query = query.orderBy(sortBy as any, sortOrder).limit(perPage).offset(offset);
+  query = query
+    .orderBy(sortBy as any, sortOrder)
+    .limit(perPage)
+    .offset(offset);
 
-  const [contacts, countResult] = await Promise.all([
-    query.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [contacts, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 
@@ -68,11 +68,7 @@ export async function listContacts(
 export async function getContact(id: number): Promise<Contact> {
   const db = getDb();
 
-  const contact = await db
-    .selectFrom('contacts')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const contact = await db.selectFrom('contacts').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!contact) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Contact not found');
@@ -85,11 +81,7 @@ export async function createContact(data: NewContact): Promise<Contact> {
   const db = getDb();
 
   try {
-    return await db
-      .insertInto('contacts')
-      .values(data)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return await db.insertInto('contacts').values(data).returningAll().executeTakeFirstOrThrow();
   } catch (err: any) {
     if (err.code === '23505') {
       throw new AppError(409, ErrorCode.CONFLICT, 'Contact with this email already exists');
@@ -101,12 +93,7 @@ export async function createContact(data: NewContact): Promise<Contact> {
 export async function updateContact(id: number, data: ContactUpdate): Promise<Contact> {
   const db = getDb();
 
-  const result = await db
-    .updateTable('contacts')
-    .set(data)
-    .where('id', '=', id)
-    .returningAll()
-    .executeTakeFirst();
+  const result = await db.updateTable('contacts').set(data).where('id', '=', id).returningAll().executeTakeFirst();
 
   if (!result) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Contact not found');
@@ -118,10 +105,7 @@ export async function updateContact(id: number, data: ContactUpdate): Promise<Co
 export async function deleteContact(id: number): Promise<void> {
   const db = getDb();
 
-  const result = await db
-    .deleteFrom('contacts')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('contacts').where('id', '=', id).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Contact not found');
@@ -195,10 +179,7 @@ export async function searchContacts(query: {
 
   dbQuery = dbQuery.orderBy('created_at', 'desc').limit(perPage).offset(offset);
 
-  const [contacts, countResult] = await Promise.all([
-    dbQuery.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [contacts, countResult] = await Promise.all([dbQuery.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 

@@ -48,7 +48,7 @@ export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queu
 
   // Run immediately on start, then every 60 seconds
   await poll();
-  const interval = setInterval(poll, 60_000);
+  const interval = setInterval(() => void poll(), 60_000);
 
   console.log('Scheduler: polling every 60s for SCHEDULED campaigns');
 

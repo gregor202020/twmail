@@ -73,11 +73,7 @@ export async function updateApiKey(id: number, userId: number, name?: string, sc
 export async function deleteApiKey(id: number, userId: number) {
   const db = getDb();
 
-  const result = await db
-    .deleteFrom('api_keys')
-    .where('id', '=', id)
-    .where('user_id', '=', userId)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('api_keys').where('id', '=', id).where('user_id', '=', userId).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'API key not found');

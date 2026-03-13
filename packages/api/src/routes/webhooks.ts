@@ -12,11 +12,22 @@ import {
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const VALID_EVENTS = [
-  'contact.created', 'contact.updated', 'contact.deleted', 'contact.unsubscribed',
-  'email.sent', 'email.delivered', 'email.opened', 'email.clicked',
-  'email.bounced', 'email.complained',
-  'campaign.scheduled', 'campaign.sending', 'campaign.completed', 'campaign.ab_winner',
-  'import.completed', 'webhook.test',
+  'contact.created',
+  'contact.updated',
+  'contact.deleted',
+  'contact.unsubscribed',
+  'email.sent',
+  'email.delivered',
+  'email.opened',
+  'email.clicked',
+  'email.bounced',
+  'email.complained',
+  'campaign.scheduled',
+  'campaign.sending',
+  'campaign.completed',
+  'campaign.ab_winner',
+  'import.completed',
+  'webhook.test',
 ];
 
 const createSchema = z.object({

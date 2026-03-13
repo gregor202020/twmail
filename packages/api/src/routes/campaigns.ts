@@ -53,16 +53,19 @@ const scheduleSchema = z.object({
 });
 
 const abTestSchema = z.object({
-  variants: z.array(
-    z.object({
-      variant_name: z.string().min(1),
-      subject: z.string().min(1),
-      preview_text: z.string().optional().nullable(),
-      content_html: z.string().optional().nullable(),
-      content_json: z.record(z.unknown()).optional().nullable(),
-      percentage: z.number().min(1).max(100),
-    }),
-  ).min(2).max(4),
+  variants: z
+    .array(
+      z.object({
+        variant_name: z.string().min(1),
+        subject: z.string().min(1),
+        preview_text: z.string().optional().nullable(),
+        content_html: z.string().optional().nullable(),
+        content_json: z.record(z.unknown()).optional().nullable(),
+        percentage: z.number().min(1).max(100),
+      }),
+    )
+    .min(2)
+    .max(4),
 });
 
 export const campaignRoutes: FastifyPluginAsync = async (app) => {

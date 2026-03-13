@@ -5,11 +5,7 @@ import { AppError } from '../plugins/error-handler.js';
 export async function listLists() {
   const db = getDb();
 
-  const lists = await db
-    .selectFrom('lists')
-    .selectAll()
-    .orderBy('created_at', 'desc')
-    .execute();
+  const lists = await db.selectFrom('lists').selectAll().orderBy('created_at', 'desc').execute();
 
   return lists;
 }
@@ -17,11 +13,7 @@ export async function listLists() {
 export async function getList(id: number): Promise<List> {
   const db = getDb();
 
-  const list = await db
-    .selectFrom('lists')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const list = await db.selectFrom('lists').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!list) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'List not found');
@@ -44,15 +36,13 @@ export async function createList(data: { name: string; description?: string; typ
     .executeTakeFirstOrThrow();
 }
 
-export async function updateList(id: number, data: { name?: string; description?: string; type?: number }): Promise<List> {
+export async function updateList(
+  id: number,
+  data: { name?: string; description?: string; type?: number },
+): Promise<List> {
   const db = getDb();
 
-  const result = await db
-    .updateTable('lists')
-    .set(data)
-    .where('id', '=', id)
-    .returningAll()
-    .executeTakeFirst();
+  const result = await db.updateTable('lists').set(data).where('id', '=', id).returningAll().executeTakeFirst();
 
   if (!result) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'List not found');
@@ -64,20 +54,14 @@ export async function updateList(id: number, data: { name?: string; description?
 export async function deleteList(id: number): Promise<void> {
   const db = getDb();
 
-  const result = await db
-    .deleteFrom('lists')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('lists').where('id', '=', id).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'List not found');
   }
 }
 
-export async function getListContacts(
-  listId: number,
-  params: PaginationParams,
-): Promise<PaginatedResponse<Contact>> {
+export async function getListContacts(listId: number, params: PaginationParams): Promise<PaginatedResponse<Contact>> {
   const db = getDb();
   const page = params.page ?? 1;
   const perPage = Math.min(params.per_page ?? 50, 200);

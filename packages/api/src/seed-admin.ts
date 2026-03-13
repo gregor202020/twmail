@@ -42,10 +42,7 @@ async function main() {
   const db = getDb();
 
   // Check if user already exists
-  const existing = await db.selectFrom('users')
-    .select('id')
-    .where('email', '=', email)
-    .executeTakeFirst();
+  const existing = await db.selectFrom('users').select('id').where('email', '=', email).executeTakeFirst();
 
   if (existing) {
     console.log(`User "${email}" already exists (id=${existing.id}). Skipping.`);
@@ -55,7 +52,8 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  const user = await db.insertInto('users')
+  const user = await db
+    .insertInto('users')
     .values({
       email,
       name,

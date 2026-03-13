@@ -20,10 +20,7 @@ export async function listTemplates(
 
   query = query.orderBy('created_at', 'desc').limit(perPage).offset(offset);
 
-  const [templates, countResult] = await Promise.all([
-    query.execute(),
-    countQuery.executeTakeFirstOrThrow(),
-  ]);
+  const [templates, countResult] = await Promise.all([query.execute(), countQuery.executeTakeFirstOrThrow()]);
 
   const total = Number(countResult.count);
 
@@ -36,11 +33,7 @@ export async function listTemplates(
 export async function getTemplate(id: number): Promise<Template> {
   const db = getDb();
 
-  const template = await db
-    .selectFrom('templates')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const template = await db.selectFrom('templates').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!template) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Template not found');
@@ -86,12 +79,7 @@ export async function updateTemplate(
 ): Promise<Template> {
   const db = getDb();
 
-  const result = await db
-    .updateTable('templates')
-    .set(data)
-    .where('id', '=', id)
-    .returningAll()
-    .executeTakeFirst();
+  const result = await db.updateTable('templates').set(data).where('id', '=', id).returningAll().executeTakeFirst();
 
   if (!result) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Template not found');
@@ -103,10 +91,7 @@ export async function updateTemplate(
 export async function deleteTemplate(id: number): Promise<void> {
   const db = getDb();
 
-  const result = await db
-    .deleteFrom('templates')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('templates').where('id', '=', id).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Template not found');

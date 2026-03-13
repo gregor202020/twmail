@@ -14,8 +14,8 @@ async function main() {
     process.exit(0);
   };
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 
   try {
     await app.listen({ port: config.API_PORT, host: config.API_HOST });
@@ -26,4 +26,4 @@ async function main() {
   }
 }
 
-main();
+void main();

@@ -139,7 +139,8 @@ ${body}
 // ---------------------------------------------------------------------------
 // Template 1: Newsletter - Classic
 // ---------------------------------------------------------------------------
-const newsletterClassic = wrapDocument(`
+const newsletterClassic = wrapDocument(
+  `
 ${headerBlock('Monthly Newsletter')}
 
 <!-- Hero Image -->
@@ -205,13 +206,15 @@ ${headerBlock('Monthly Newsletter')}
 </table>
 
 ${footerBlock()}
-`, 'What\'s smokin\' this month at Third Wave BBQ');
-
+`,
+  "What's smokin' this month at Third Wave BBQ",
+);
 
 // ---------------------------------------------------------------------------
 // Template 2: Newsletter - Two Column
 // ---------------------------------------------------------------------------
-const newsletterTwoColumn = wrapDocument(`
+const newsletterTwoColumn = wrapDocument(
+  `
 ${headerBlock('Weekly Digest')}
 
 <!-- Intro -->
@@ -353,13 +356,15 @@ ${headerBlock('Weekly Digest')}
 </table>
 
 ${footerBlock()}
-`, 'This week: new menu items, live music, and more');
-
+`,
+  'This week: new menu items, live music, and more',
+);
 
 // ---------------------------------------------------------------------------
 // Template 3: Promotional - Sale
 // ---------------------------------------------------------------------------
-const promotionalSale = wrapDocument(`
+const promotionalSale = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Hero Sale Banner -->
@@ -469,13 +474,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, '20% off all catering orders this week!');
-
+`,
+  '20% off all catering orders this week!',
+);
 
 // ---------------------------------------------------------------------------
 // Template 4: Promotional - Event
 // ---------------------------------------------------------------------------
-const promotionalEvent = wrapDocument(`
+const promotionalEvent = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Hero Event Banner -->
@@ -558,13 +565,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, 'You\'re invited to our Summer Cookout!');
-
+`,
+  "You're invited to our Summer Cookout!",
+);
 
 // ---------------------------------------------------------------------------
 // Template 5: Welcome Email
 // ---------------------------------------------------------------------------
-const welcomeEmail = wrapDocument(`
+const welcomeEmail = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Welcome Hero -->
@@ -660,13 +669,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, 'Welcome to Third Wave BBQ!');
-
+`,
+  'Welcome to Third Wave BBQ!',
+);
 
 // ---------------------------------------------------------------------------
 // Template 6: Order Confirmation
 // ---------------------------------------------------------------------------
-const orderConfirmation = wrapDocument(`
+const orderConfirmation = wrapDocument(
+  `
 ${headerBlock('Order Confirmation')}
 
 <!-- Confirmation Badge -->
@@ -781,13 +792,15 @@ ${headerBlock('Order Confirmation')}
 </table>
 
 ${footerBlock()}
-`, 'Your Third Wave BBQ order is confirmed!');
-
+`,
+  'Your Third Wave BBQ order is confirmed!',
+);
 
 // ---------------------------------------------------------------------------
 // Template 7: Announcement
 // ---------------------------------------------------------------------------
-const announcement = wrapDocument(`
+const announcement = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Hero -->
@@ -847,13 +860,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, 'Something new is coming off the smoker...');
-
+`,
+  'Something new is coming off the smoker...',
+);
 
 // ---------------------------------------------------------------------------
 // Template 8: Re-engagement
 // ---------------------------------------------------------------------------
-const reengagement = wrapDocument(`
+const reengagement = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Hero -->
@@ -951,13 +966,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, 'We miss you! Come back for 15% off');
-
+`,
+  'We miss you! Come back for 15% off',
+);
 
 // ---------------------------------------------------------------------------
 // Template 9: Feedback Request
 // ---------------------------------------------------------------------------
-const feedbackRequest = wrapDocument(`
+const feedbackRequest = wrapDocument(
+  `
 ${headerBlock()}
 
 <!-- Body -->
@@ -1071,13 +1088,15 @@ ${headerBlock()}
 </table>
 
 ${footerBlock()}
-`, 'How was your Third Wave BBQ experience?');
-
+`,
+  'How was your Third Wave BBQ experience?',
+);
 
 // ---------------------------------------------------------------------------
 // Template 10: Plain Text Style
 // ---------------------------------------------------------------------------
-const plainTextStyle = wrapDocument(`
+const plainTextStyle = wrapDocument(
+  `
 <!-- Simple plain-text style email -->
 <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
@@ -1133,8 +1152,9 @@ const plainTextStyle = wrapDocument(`
     </td>
   </tr>
 </table>
-`, 'A personal note from Greg at Third Wave BBQ');
-
+`,
+  'A personal note from Greg at Third Wave BBQ',
+);
 
 // ---------------------------------------------------------------------------
 // Template definitions
@@ -1165,10 +1185,7 @@ async function main() {
   const db = getDb();
 
   // Check if default templates already exist
-  const existing = await db.selectFrom('templates')
-    .select('id')
-    .where('is_default', '=', true)
-    .executeTakeFirst();
+  const existing = await db.selectFrom('templates').select('id').where('is_default', '=', true).executeTakeFirst();
 
   if (existing) {
     console.log('Default templates already exist. Skipping seed.');
@@ -1186,10 +1203,7 @@ async function main() {
     is_default: true,
   }));
 
-  const inserted = await db.insertInto('templates')
-    .values(rows)
-    .returning(['id', 'name', 'category'])
-    .execute();
+  const inserted = await db.insertInto('templates').values(rows).returning(['id', 'name', 'category']).execute();
 
   console.log(`Inserted ${inserted.length} default templates:`);
   for (const t of inserted) {

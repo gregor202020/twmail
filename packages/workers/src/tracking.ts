@@ -20,22 +20,19 @@ export function rewriteLinks(html: string, messageId: string): { html: string; l
   const linkMap: Record<string, string> = {};
 
   // Match href="..." in anchor tags, skip mailto: and tel: and tracking URLs
-  const rewritten = html.replace(
-    /href="(https?:\/\/[^"]+)"/gi,
-    (_match, url: string) => {
-      // Don't rewrite our own tracking URLs
-      if (url.startsWith(`${BASE_URL}/t/`)) {
-        return _match;
-      }
-      // Don't rewrite unsubscribe URLs (already tracked)
-      if (url.includes('/t/u/') || url.includes('/t/preferences/')) {
-        return _match;
-      }
-      const linkHash = hashUrl(url);
-      linkMap[linkHash] = url;
-      return `href="${BASE_URL}/t/c/${messageId}/${linkHash}"`;
-    },
-  );
+  const rewritten = html.replace(/href="(https?:\/\/[^"]+)"/gi, (_match, url: string) => {
+    // Don't rewrite our own tracking URLs
+    if (url.startsWith(`${BASE_URL}/t/`)) {
+      return _match;
+    }
+    // Don't rewrite unsubscribe URLs (already tracked)
+    if (url.includes('/t/u/') || url.includes('/t/preferences/')) {
+      return _match;
+    }
+    const linkHash = hashUrl(url);
+    linkMap[linkHash] = url;
+    return `href="${BASE_URL}/t/c/${messageId}/${linkHash}"`;
+  });
 
   return { html: rewritten, linkMap };
 }

@@ -9,30 +9,32 @@ const ASSETS_DIR = process.env['ASSETS_DIR'] ?? '/data/assets';
 const BASE_URL = process.env['BASE_URL'] ?? 'https://mail.thirdwavebbq.com.au';
 
 const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-  'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv', 'video/mp4', 'video/quicktime', 'application/zip',
+  'text/csv',
+  'video/mp4',
+  'video/quicktime',
+  'application/zip',
 ]);
 
 const MAX_IMAGE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-export async function listAssets(
-  params: PaginationParams,
-): Promise<PaginatedResponse<Asset>> {
+export async function listAssets(params: PaginationParams): Promise<PaginatedResponse<Asset>> {
   const db = getDb();
   const page = params.page ?? 1;
   const perPage = Math.min(params.per_page ?? 50, 200);
   const offset = (page - 1) * perPage;
 
   const [assets, countResult] = await Promise.all([
-    db.selectFrom('assets').selectAll()
-      .orderBy('created_at', 'desc')
-      .limit(perPage).offset(offset)
-      .execute(),
-    db.selectFrom('assets').select(db.fn.countAll<number>().as('count'))
-      .executeTakeFirstOrThrow(),
+    db.selectFrom('assets').selectAll().orderBy('created_at', 'desc').limit(perPage).offset(offset).execute(),
+    db.selectFrom('assets').select(db.fn.countAll<number>().as('count')).executeTakeFirstOrThrow(),
   ]);
 
   const total = Number(countResult.count);
@@ -45,11 +47,7 @@ export async function listAssets(
 
 export async function getAsset(id: number): Promise<Asset> {
   const db = getDb();
-  const asset = await db
-    .selectFrom('assets')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const asset = await db.selectFrom('assets').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!asset) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Asset not found');

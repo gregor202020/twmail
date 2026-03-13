@@ -12,11 +12,7 @@ export async function login(email: string, password: string) {
   const db = getDb();
   const config = getConfig();
 
-  const user = await db
-    .selectFrom('users')
-    .selectAll()
-    .where('email', '=', email)
-    .executeTakeFirst();
+  const user = await db.selectFrom('users').selectAll().where('email', '=', email).executeTakeFirst();
 
   if (!user) {
     throw new AppError(401, ErrorCode.UNAUTHORIZED, 'Invalid email or password');
@@ -28,11 +24,7 @@ export async function login(email: string, password: string) {
   }
 
   // Update last_login_at
-  await db
-    .updateTable('users')
-    .set({ last_login_at: new Date() })
-    .where('id', '=', user.id)
-    .execute();
+  await db.updateTable('users').set({ last_login_at: new Date() }).where('id', '=', user.id).execute();
 
   const accessToken = generateToken(user, 'access', config.JWT_EXPIRES_IN);
   const refreshToken = generateToken(user, 'refresh', config.JWT_REFRESH_EXPIRES_IN);
@@ -64,11 +56,7 @@ export async function refreshToken(token: string) {
     throw new AppError(401, ErrorCode.UNAUTHORIZED, 'Invalid token type');
   }
 
-  const user = await db
-    .selectFrom('users')
-    .selectAll()
-    .where('id', '=', payload.sub)
-    .executeTakeFirst();
+  const user = await db.selectFrom('users').selectAll().where('id', '=', payload.sub).executeTakeFirst();
 
   if (!user) {
     throw new AppError(401, ErrorCode.UNAUTHORIZED, 'User not found');

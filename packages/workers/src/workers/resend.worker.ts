@@ -15,11 +15,7 @@ export function createResendWorker(): Worker {
       const { campaignId } = job.data;
       const db = getDb();
 
-      const campaign = await db
-        .selectFrom('campaigns')
-        .selectAll()
-        .where('id', '=', campaignId)
-        .executeTakeFirst();
+      const campaign = await db.selectFrom('campaigns').selectAll().where('id', '=', campaignId).executeTakeFirst();
 
       if (!campaign) {
         return { error: 'campaign_not_found' };
@@ -52,9 +48,7 @@ export function createResendWorker(): Worker {
         nonEngagedQuery = nonEngagedQuery.where('first_open_at', 'is', null);
       } else if (trigger === 'non_click') {
         // Opened but didn't click
-        nonEngagedQuery = nonEngagedQuery
-          .where('first_open_at', 'is not', null)
-          .where('first_click_at', 'is', null);
+        nonEngagedQuery = nonEngagedQuery.where('first_open_at', 'is not', null).where('first_click_at', 'is', null);
       }
 
       const nonEngaged = await nonEngagedQuery.execute();

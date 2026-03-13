@@ -81,10 +81,7 @@ export async function getGrowthReport(days: number = 30): Promise<unknown[]> {
 
   const result = await db
     .selectFrom('contacts')
-    .select([
-      sql<string>`date_trunc('day', created_at)::date`.as('date'),
-      db.fn.countAll<number>().as('new_contacts'),
-    ])
+    .select([sql<string>`date_trunc('day', created_at)::date`.as('date'), db.fn.countAll<number>().as('new_contacts')])
     .where('created_at', '>=', sql<Date>`CURRENT_DATE - ${sql.lit(days)} * INTERVAL '1 day'`)
     .groupBy(sql`date_trunc('day', created_at)::date`)
     .orderBy('date', 'asc')
@@ -98,10 +95,7 @@ export async function getEngagementReport(): Promise<Record<string, unknown>> {
 
   const tiers = await db
     .selectFrom('contacts')
-    .select([
-      'engagement_tier',
-      db.fn.countAll<number>().as('count'),
-    ])
+    .select(['engagement_tier', db.fn.countAll<number>().as('count')])
     .where('status', '=', ContactStatus.ACTIVE)
     .groupBy('engagement_tier')
     .execute();
@@ -119,15 +113,7 @@ export async function getDeliverabilityReport(days: number = 30): Promise<Record
 
   const campaigns = await db
     .selectFrom('campaigns')
-    .select([
-      'id',
-      'name',
-      'total_sent',
-      'total_delivered',
-      'total_bounces',
-      'total_complaints',
-      'send_started_at',
-    ])
+    .select(['id', 'name', 'total_sent', 'total_delivered', 'total_bounces', 'total_complaints', 'send_started_at'])
     .where('status', '=', CampaignStatus.SENT)
     .where('send_started_at', '>=', sql<Date>`CURRENT_DATE - ${sql.lit(days)} * INTERVAL '1 day'`)
     .orderBy('send_started_at', 'desc')

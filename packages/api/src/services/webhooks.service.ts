@@ -5,20 +5,12 @@ import { randomBytes, createHmac } from 'crypto';
 
 export async function listWebhookEndpoints(): Promise<WebhookEndpoint[]> {
   const db = getDb();
-  return db
-    .selectFrom('webhook_endpoints')
-    .selectAll()
-    .orderBy('created_at', 'desc')
-    .execute();
+  return db.selectFrom('webhook_endpoints').selectAll().orderBy('created_at', 'desc').execute();
 }
 
 export async function getWebhookEndpoint(id: number): Promise<WebhookEndpoint> {
   const db = getDb();
-  const endpoint = await db
-    .selectFrom('webhook_endpoints')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const endpoint = await db.selectFrom('webhook_endpoints').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!endpoint) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Webhook endpoint not found');
@@ -67,10 +59,7 @@ export async function updateWebhookEndpoint(
 
 export async function deleteWebhookEndpoint(id: number): Promise<void> {
   const db = getDb();
-  const result = await db
-    .deleteFrom('webhook_endpoints')
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const result = await db.deleteFrom('webhook_endpoints').where('id', '=', id).executeTakeFirst();
 
   if (result.numDeletedRows === 0n) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Webhook endpoint not found');
@@ -121,19 +110,12 @@ export async function getWebhookDeliveries(
 }
 
 // Enqueue a webhook delivery for all matching endpoints
-export async function enqueueWebhookDelivery(
-  eventType: string,
-  data: Record<string, unknown>,
-): Promise<void> {
+export async function enqueueWebhookDelivery(eventType: string, data: Record<string, unknown>): Promise<void> {
   const db = getDb();
   const redis = getRedis();
 
   // Find active endpoints subscribed to this event
-  const endpoints = await db
-    .selectFrom('webhook_endpoints')
-    .selectAll()
-    .where('active', '=', true)
-    .execute();
+  const endpoints = await db.selectFrom('webhook_endpoints').selectAll().where('active', '=', true).execute();
 
   const matchingEndpoints = endpoints.filter((ep) => ep.events.includes(eventType));
 

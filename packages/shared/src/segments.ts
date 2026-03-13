@@ -10,15 +10,28 @@ import type { SegmentRule, SegmentRuleGroup } from './types.js';
 
 // Contact table columns that can be filtered on
 const ALLOWED_COLUMNS = new Set([
-  'email', 'status', 'first_name', 'last_name', 'phone', 'company',
-  'city', 'country', 'timezone', 'source', 'engagement_score',
-  'engagement_tier', 'last_open_at', 'last_click_at', 'last_activity_at',
-  'subscribed_at', 'unsubscribed_at', 'created_at', 'updated_at',
+  'email',
+  'status',
+  'first_name',
+  'last_name',
+  'phone',
+  'company',
+  'city',
+  'country',
+  'timezone',
+  'source',
+  'engagement_score',
+  'engagement_tier',
+  'last_open_at',
+  'last_click_at',
+  'last_activity_at',
+  'subscribed_at',
+  'unsubscribed_at',
+  'created_at',
+  'updated_at',
 ]);
 
-export function buildRuleFilter(
-  group: SegmentRuleGroup,
-): (eb: ExpressionBuilder<Database, 'contacts'>) => any {
+export function buildRuleFilter(group: SegmentRuleGroup): (eb: ExpressionBuilder<Database, 'contacts'>) => any {
   return (eb: ExpressionBuilder<Database, 'contacts'>) => {
     const conditions = group.rules.map((rule) => {
       if ('logic' in rule) {
@@ -39,10 +52,7 @@ export function buildRuleFilter(
   };
 }
 
-export function buildSingleRule(
-  eb: ExpressionBuilder<Database, 'contacts'>,
-  rule: SegmentRule,
-): any {
+export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rule: SegmentRule): any {
   const { field, operator, value } = rule;
 
   // Handle custom_fields with jsonb path
@@ -139,11 +149,7 @@ function buildJsonbRule(
 export async function resolveSegmentContactIds(segmentId: number): Promise<number[]> {
   const db = getDb();
 
-  const segment = await db
-    .selectFrom('segments')
-    .selectAll()
-    .where('id', '=', segmentId)
-    .executeTakeFirst();
+  const segment = await db.selectFrom('segments').selectAll().where('id', '=', segmentId).executeTakeFirst();
 
   if (!segment) {
     throw new Error(`Segment not found: ${segmentId}`);

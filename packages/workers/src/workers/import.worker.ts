@@ -10,8 +10,15 @@ export interface ImportJobData {
 }
 
 const STANDARD_FIELDS = new Set([
-  'email', 'first_name', 'last_name', 'phone', 'company',
-  'city', 'country', 'timezone', 'source',
+  'email',
+  'first_name',
+  'last_name',
+  'phone',
+  'company',
+  'city',
+  'country',
+  'timezone',
+  'source',
 ]);
 
 export function createImportWorker(): Worker {
@@ -80,11 +87,10 @@ export function createImportWorker(): Worker {
 
             if (existing) {
               // COMP-07: Never re-subscribe suppressed contacts via import
-              const isSuppressed = (
+              const isSuppressed =
                 existing.status === ContactStatus.BOUNCED ||
                 existing.status === ContactStatus.COMPLAINED ||
-                existing.status === ContactStatus.UNSUBSCRIBED
-              );
+                existing.status === ContactStatus.UNSUBSCRIBED;
               if (isSuppressed) {
                 skipped++;
                 continue;
@@ -113,11 +119,7 @@ export function createImportWorker(): Worker {
               }
 
               if (Object.keys(updateData).length > 0) {
-                await db
-                  .updateTable('contacts')
-                  .set(updateData)
-                  .where('id', '=', existing.id)
-                  .execute();
+                await db.updateTable('contacts').set(updateData).where('id', '=', existing.id).execute();
               }
 
               // Add to list if specified

@@ -66,11 +66,7 @@ export function createAbEvalWorker(): Worker {
       const winner = variants[winnerIdx]!;
 
       // Mark winner
-      await db
-        .updateTable('campaign_variants')
-        .set({ is_winner: true })
-        .where('id', '=', winner.id)
-        .execute();
+      await db.updateTable('campaign_variants').set({ is_winner: true }).where('id', '=', winner.id).execute();
 
       // BUG-03: Read holdback from PostgreSQL (persisted by campaign-send orchestrator)
       const holdbackRows = await db
@@ -78,7 +74,7 @@ export function createAbEvalWorker(): Worker {
         .select('contact_id')
         .where('campaign_id', '=', campaignId)
         .execute();
-      const holdbackContactIds = holdbackRows.map(r => r.contact_id);
+      const holdbackContactIds = holdbackRows.map((r) => r.contact_id);
 
       if (holdbackContactIds.length > 0) {
         const bulkSendQueue = new Queue('bulk-send', { connection: redis as any });
@@ -94,10 +90,7 @@ export function createAbEvalWorker(): Worker {
         await bulkSendQueue.close();
 
         // Clean up holdback records after winner contacts are queued
-        await db
-          .deleteFrom('campaign_holdback_contacts')
-          .where('campaign_id', '=', campaignId)
-          .execute();
+        await db.deleteFrom('campaign_holdback_contacts').where('campaign_id', '=', campaignId).execute();
       }
 
       return { winnerId: winner.id, winProbability: maxProb };

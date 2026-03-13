@@ -11,10 +11,7 @@ const TRACKING_PIXEL = Buffer.from(
 const APPLE_PROXY_PREFIXES = ['17.'];
 
 // Known mail proxy user-agents for machine open detection
-const MACHINE_UA_PATTERNS: RegExp[] = [
-  /YahooMailProxy/i,
-  /Googleimageproxy/i,
-];
+const MACHINE_UA_PATTERNS: RegExp[] = [/YahooMailProxy/i, /Googleimageproxy/i];
 
 function escapeHtml(str: string): string {
   return str
@@ -39,7 +36,9 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
       reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
 
       // Record open event async (fire and forget)
-      recordOpen(db, messageId, request).catch((err) => { request.log.error({ err, messageId }, 'recordOpen failed'); });
+      recordOpen(db, messageId, request).catch((err) => {
+        request.log.error({ err, messageId }, 'recordOpen failed');
+      });
 
       return reply.send(TRACKING_PIXEL);
     },
@@ -65,7 +64,9 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
       const targetUrl = resolveClickUrl(sentEvent?.metadata, linkHash);
 
       // Record click event async (write-only audit trail — not used for URL resolution)
-      recordClick(db, messageId, linkHash, targetUrl, request).catch((err) => { request.log.error({ err, messageId, linkHash }, 'recordClick failed'); });
+      recordClick(db, messageId, linkHash, targetUrl, request).catch((err) => {
+        request.log.error({ err, messageId, linkHash }, 'recordClick failed');
+      });
 
       return reply.redirect(targetUrl);
     },
@@ -226,21 +227,11 @@ async function recordOpen(db: any, messageId: string, request: any): Promise<voi
         .execute();
     }
 
-    await db
-      .updateTable('messages')
-      .set({ is_machine_open: true })
-      .where('id', '=', messageId)
-      .execute();
+    await db.updateTable('messages').set({ is_machine_open: true }).where('id', '=', messageId).execute();
   }
 }
 
-async function recordClick(
-  db: any,
-  messageId: string,
-  linkHash: string,
-  url: string,
-  request: any,
-): Promise<void> {
+async function recordClick(db: any, messageId: string, linkHash: string, url: string, request: any): Promise<void> {
   const message = await db
     .selectFrom('messages')
     .select(['contact_id', 'campaign_id', 'variant_id'])
@@ -321,11 +312,7 @@ const CLICK_FALLBACK_URL = 'https://thirdwavebbq.com.au';
 export function resolveClickUrl(sentMetadata: unknown, linkHash: string): string {
   let targetUrl = CLICK_FALLBACK_URL;
 
-  if (
-    sentMetadata != null &&
-    typeof sentMetadata === 'object' &&
-    'link_map' in sentMetadata
-  ) {
+  if (sentMetadata != null && typeof sentMetadata === 'object' && 'link_map' in sentMetadata) {
     const map = (sentMetadata as Record<string, unknown>)['link_map'];
     if (map != null && typeof map === 'object' && linkHash in map) {
       const candidate = (map as Record<string, unknown>)[linkHash];

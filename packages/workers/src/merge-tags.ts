@@ -5,11 +5,7 @@ const BASE_URL = process.env['BASE_URL'] ?? 'https://mail.thirdwavebbq.com.au';
 // Merge tag pattern: {{field_name}} or {{field_name|"fallback"}}
 const MERGE_TAG_REGEX = /\{\{(\w+(?:\.\w+)?)(?:\|"([^"]*)")?\}\}/g;
 
-export function processMergeTags(
-  html: string,
-  contact: Contact,
-  messageId: string,
-): string {
+export function processMergeTags(html: string, contact: Contact, messageId: string): string {
   return html.replace(MERGE_TAG_REGEX, (_match, field: string, fallback: string | undefined) => {
     const value = resolveField(contact, field, messageId);
     if (value !== null && value !== undefined && value !== '') {
@@ -19,11 +15,7 @@ export function processMergeTags(
   });
 }
 
-function resolveField(
-  contact: Contact,
-  field: string,
-  messageId: string,
-): string | null {
+function resolveField(contact: Contact, field: string, messageId: string): string | null {
   // Special URL tags
   switch (field) {
     case 'unsubscribe_url':

@@ -4,12 +4,27 @@ import { AppError } from '../plugins/error-handler.js';
 
 // Auto-detection mappings for common column names
 const AUTO_FIELD_MAP: Record<string, string> = {
-  email: 'email', 'e-mail': 'email', email_address: 'email', emailaddress: 'email',
-  first_name: 'first_name', firstname: 'first_name', first: 'first_name', given_name: 'first_name',
-  last_name: 'last_name', lastname: 'last_name', last: 'last_name', surname: 'last_name', family_name: 'last_name',
-  phone: 'phone', telephone: 'phone', mobile: 'phone',
-  company: 'company', organization: 'company', org: 'company',
-  city: 'city', town: 'city',
+  email: 'email',
+  'e-mail': 'email',
+  email_address: 'email',
+  emailaddress: 'email',
+  first_name: 'first_name',
+  firstname: 'first_name',
+  first: 'first_name',
+  given_name: 'first_name',
+  last_name: 'last_name',
+  lastname: 'last_name',
+  last: 'last_name',
+  surname: 'last_name',
+  family_name: 'last_name',
+  phone: 'phone',
+  telephone: 'phone',
+  mobile: 'phone',
+  company: 'company',
+  organization: 'company',
+  org: 'company',
+  city: 'city',
+  town: 'city',
   country: 'country',
 };
 
@@ -48,11 +63,7 @@ export async function createCsvImport(data: {
 
 export async function getImport(id: number): Promise<Import> {
   const db = getDb();
-  const imp = await db
-    .selectFrom('imports')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
+  const imp = await db.selectFrom('imports').selectAll().where('id', '=', id).executeTakeFirst();
 
   if (!imp) {
     throw new AppError(404, ErrorCode.NOT_FOUND, 'Import not found');
@@ -121,7 +132,11 @@ async function enqueueImport(
 }
 
 function parsePastedText(text: string): Array<Record<string, string>> {
-  const lines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length === 0) return [];
 
   // Detect format: tabs, commas, or one-per-line
@@ -150,7 +165,11 @@ function parsePastedText(text: string): Array<Record<string, string>> {
 }
 
 function parseCsv(content: string): Array<Record<string, string>> {
-  const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length < 2) return [];
 
   // Detect delimiter

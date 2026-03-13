@@ -175,7 +175,25 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 export interface SegmentRule {
   field: string;
-  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'is_set' | 'is_not_set' | 'in' | 'not_in' | 'between' | 'before' | 'after' | 'within_days';
+  operator:
+    | 'eq'
+    | 'neq'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'contains'
+    | 'not_contains'
+    | 'starts_with'
+    | 'ends_with'
+    | 'is_set'
+    | 'is_not_set'
+    | 'in'
+    | 'not_in'
+    | 'between'
+    | 'before'
+    | 'after'
+    | 'within_days';
   value?: string | number | boolean | string[] | number[];
 }
 

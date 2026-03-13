@@ -11,7 +11,10 @@ const createSchema = z.object({
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  scopes: z.array(z.enum(['read', 'write', 'admin'])).min(1).optional(),
+  scopes: z
+    .array(z.enum(['read', 'write', 'admin']))
+    .min(1)
+    .optional(),
 });
 
 export const apiKeyRoutes: FastifyPluginAsync = async (app) => {
