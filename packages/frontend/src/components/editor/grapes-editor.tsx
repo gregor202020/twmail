@@ -11,7 +11,11 @@ import type { Editor } from 'grapesjs';
 import grapesjs from 'grapesjs';
 import 'grapesjs/dist/css/grapes.min.css';
 import mjml from 'grapesjs-mjml';
-import { Monitor, Smartphone, Eye, Undo2, Redo2, Code, Save, Layers, Palette, LayoutGrid } from 'lucide-react';
+import {
+  Monitor, Smartphone, Eye, Undo2, Redo2, Code, Save,
+  Layers, Palette, LayoutGrid, Image, PanelLeftClose, PanelLeftOpen,
+  ChevronDown, ChevronRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +39,7 @@ const DEFAULT_MJML = `<mjml>
           Your Email Title
         </mj-text>
         <mj-text font-size="16px" color="#555555" line-height="1.6">
-          Start editing this template by clicking on any element. Use the blocks panel on the left to drag in new content blocks.
+          Start editing this template by clicking on any element. Drag blocks from the left panel to add new content.
         </mj-text>
         <mj-button background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" href="#">
           Call to Action
@@ -45,6 +49,8 @@ const DEFAULT_MJML = `<mjml>
   </mj-body>
 </mjml>`;
 
+type PanelTab = 'blocks' | 'styles' | 'layers' | 'images';
+
 export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
   function GrapesEditor({ initialContent, onChange, onSave, saving }, ref) {
     const editorRef = useRef<Editor | null>(null);
@@ -52,16 +58,17 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
     const [preview, setPreview] = useState(false);
     const [ready, setReady] = useState(false);
-    const [activePanel, setActivePanel] = useState<'blocks' | 'styles' | 'layers'>('blocks');
+    const [activePanel, setActivePanel] = useState<PanelTab>('blocks');
+    const [panelOpen, setPanelOpen] = useState(true);
+    const [uploadedImages, setUploadedImages] = useState<Array<{ id: number; url: string; filename: string }>>([]);
+    const [uploading, setUploading] = useState(false);
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
     useImperativeHandle(ref, () => ({
       getHtml: () => {
         if (!editorRef.current) return '';
         try {
-          const result = editorRef.current.runCommand('mjml-code-to-html') as {
-            html: string;
-            errors: Array<{ formattedMessage: string }>;
-          };
+          const result = editorRef.current.runCommand('mjml-code-to-html') as { html: string };
           return result?.html ?? '';
         } catch {
           return editorRef.current.getHtml();
@@ -72,6 +79,69 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         return JSON.stringify(editorRef.current.getProjectData());
       },
     }));
+
+    // Load existing images from API
+    useEffect(() => {
+      fetch('/api/proxy/assets?page=1&per_page=100', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.data) {
+            setUploadedImages(
+              data.data
+                .filter((a: Record<string, unknown>) => typeof a.mime_type === 'string' && (a.mime_type as string).startsWith('image/'))
+                .map((a: Record<string, unknown>) => ({ id: a.id, url: a.url, filename: a.original_name || a.filename }))
+            );
+          }
+        })
+        .catch(() => {});
+    }, []);
+
+    // Handle image upload
+    const handleImageUpload = useCallback(async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      setUploading(true);
+      try {
+        for (const file of Array.from(files)) {
+          if (!file.type.startsWith('image/')) continue;
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch('/api/proxy/assets/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          });
+          if (res.ok) {
+            const json = await res.json();
+            const asset = json.data;
+            const newImg = { id: asset.id, url: asset.url, filename: asset.original_name || asset.filename };
+            setUploadedImages(prev => [newImg, ...prev]);
+            // Add to GrapesJS asset manager
+            if (editorRef.current) {
+              editorRef.current.AssetManager.add({ src: asset.url, name: asset.original_name });
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setUploading(false);
+    }, []);
+
+    // Insert image into editor canvas
+    const insertImage = useCallback((url: string) => {
+      if (!editorRef.current) return;
+      const selected = editorRef.current.getSelected();
+      if (selected && selected.get('type') === 'mj-image') {
+        selected.set('attributes', { ...selected.getAttributes(), src: url });
+      } else {
+        // Add an mj-image component to the end of the first section
+        const wrapper = editorRef.current.getWrapper();
+        const body = wrapper?.find('mj-body')?.[0] || wrapper;
+        if (body) {
+          body.append(`<mj-section><mj-column><mj-image src="${url}" alt="Image" padding="10px" /></mj-column></mj-section>`);
+        }
+      }
+    }, []);
 
     useEffect(() => {
       if (!containerRef.current || editorRef.current) return;
@@ -90,6 +160,12 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             resetDevices: false,
           },
         },
+        assetManager: {
+          upload: '/api/proxy/assets/upload',
+          uploadName: 'file',
+          credentials: 'include',
+          autoAdd: true,
+        },
         deviceManager: {
           devices: [
             { name: 'Desktop', width: '' },
@@ -104,33 +180,10 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         },
         styleManager: {
           sectors: [
-            {
-              name: 'Typography',
-              open: true,
-              properties: [
-                'font-family', 'font-size', 'font-weight', 'letter-spacing',
-                'color', 'line-height', 'text-align', 'text-decoration',
-              ],
-            },
-            {
-              name: 'Layout',
-              open: false,
-              properties: [
-                'padding', 'margin', 'width', 'max-width', 'min-height',
-              ],
-            },
-            {
-              name: 'Background',
-              open: false,
-              properties: ['background-color', 'background-image'],
-            },
-            {
-              name: 'Border',
-              open: false,
-              properties: [
-                'border-radius', 'border', 'border-width', 'border-color',
-              ],
-            },
+            { name: 'Typography', open: true, properties: ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color', 'line-height', 'text-align', 'text-decoration'] },
+            { name: 'Layout', open: false, properties: ['padding', 'margin', 'width', 'max-width', 'min-height'] },
+            { name: 'Background', open: false, properties: ['background-color', 'background-image'] },
+            { name: 'Border', open: false, properties: ['border-radius', 'border', 'border-width', 'border-color'] },
           ],
         },
       });
@@ -150,6 +203,11 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         editor.setComponents(content);
       }
 
+      // Add existing images to asset manager
+      uploadedImages.forEach(img => {
+        editor.AssetManager.add({ src: img.url, name: img.filename });
+      });
+
       setReady(true);
 
       return () => {
@@ -164,28 +222,19 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     useEffect(() => {
       if (!ready || !editorRef.current || !onChange) return;
       const editor = editorRef.current;
-
       const handleUpdate = () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           try {
-            const result = editor.runCommand('mjml-code-to-html') as {
-              html: string;
-            };
-            const html = result?.html ?? editor.getHtml();
-            const json = JSON.stringify(editor.getProjectData());
-            onChange(html, json);
-          } catch {
-            // ignore
-          }
+            const result = editor.runCommand('mjml-code-to-html') as { html: string };
+            onChange(result?.html ?? editor.getHtml(), JSON.stringify(editor.getProjectData()));
+          } catch { /* ignore */ }
         }, 800);
       };
-
       editor.on('component:update', handleUpdate);
       editor.on('component:add', handleUpdate);
       editor.on('component:remove', handleUpdate);
       editor.on('component:styleUpdate', handleUpdate);
-
       return () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         editor.off('component:update', handleUpdate);
@@ -195,11 +244,10 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       };
     }, [ready, onChange]);
 
-    const setDevice = useCallback((mode: 'desktop' | 'tablet' | 'mobile') => {
-      setViewport(mode === 'tablet' ? 'desktop' : mode);
+    const setDevice = useCallback((mode: 'desktop' | 'mobile') => {
+      setViewport(mode);
       if (!editorRef.current) return;
-      const map = { desktop: 'Desktop', tablet: 'Tablet', mobile: 'Mobile' };
-      editorRef.current.setDevice(map[mode]);
+      editorRef.current.setDevice(mode === 'mobile' ? 'Mobile' : 'Desktop');
     }, []);
 
     const togglePreview = useCallback(() => {
@@ -211,50 +259,40 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
 
     const undo = useCallback(() => editorRef.current?.UndoManager.undo(), []);
     const redo = useCallback(() => editorRef.current?.UndoManager.redo(), []);
+    const toggleCode = useCallback(() => { editorRef.current?.runCommand('mjml-code'); }, []);
 
-    const toggleCode = useCallback(() => {
-      if (!editorRef.current) return;
-      editorRef.current.runCommand('mjml-code');
-    }, []);
+    const toggleSection = (name: string) => {
+      setCollapsedSections(prev => ({ ...prev, [name]: !prev[name] }));
+    };
 
-    // Blocks panel - rendered by GrapesJS into a container
-    const renderBlocksPanel = () => (
-      <div id="gjs-blocks-container" className="p-1" />
-    );
-
-    // Render style manager panel
-    const renderStylesPanel = () => (
-      <div id="gjs-styles-container" className="p-2 text-xs" />
-    );
-
-    // Render layers panel
-    const renderLayersPanel = () => (
-      <div id="gjs-layers-container" className="p-2 text-xs" />
-    );
-
-    // Mount GrapesJS panels to our custom containers
+    // Mount GrapesJS panels to containers
     useEffect(() => {
       if (!ready || !editorRef.current) return;
       const editor = editorRef.current;
 
       const blocksEl = document.getElementById('gjs-blocks-container');
       if (blocksEl && activePanel === 'blocks' && blocksEl.childElementCount === 0) {
-        const blocksView = editor.Blocks.render();
-        if (blocksView) blocksEl.appendChild(blocksView);
+        const v = editor.Blocks.render();
+        if (v) blocksEl.appendChild(v);
       }
-
       const stylesEl = document.getElementById('gjs-styles-container');
       if (stylesEl && activePanel === 'styles' && stylesEl.childElementCount === 0) {
-        const smView = editor.StyleManager.render();
-        if (smView) stylesEl.appendChild(smView);
+        const v = editor.StyleManager.render();
+        if (v) stylesEl.appendChild(v);
       }
-
       const layersEl = document.getElementById('gjs-layers-container');
       if (layersEl && activePanel === 'layers' && layersEl.childElementCount === 0) {
-        const lView = editor.Layers.render();
-        if (lView) layersEl.appendChild(lView);
+        const v = editor.Layers.render();
+        if (v) layersEl.appendChild(v);
       }
     }, [ready, activePanel]);
+
+    const panelTabs: { key: PanelTab; label: string; icon: typeof LayoutGrid }[] = [
+      { key: 'blocks', label: 'Blocks', icon: LayoutGrid },
+      { key: 'images', label: 'Images', icon: Image },
+      { key: 'layers', label: 'Layers', icon: Layers },
+      { key: 'styles', label: 'Styles', icon: Palette },
+    ];
 
     return (
       <div className="flex flex-col h-full bg-[#1a1a2e]">
@@ -262,21 +300,20 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         <div className="flex items-center justify-between h-10 px-3 bg-[#16213e] border-b border-white/10 shrink-0">
           <div className="flex items-center gap-1">
             <Button
-              variant="ghost"
-              size="icon-xs"
-              className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'desktop' && 'text-white bg-white/10')}
-              onClick={() => setDevice('desktop')}
-              title="Desktop"
+              variant="ghost" size="icon-xs"
+              className="text-white/60 hover:text-white hover:bg-white/10"
+              onClick={() => setPanelOpen(!panelOpen)}
+              title={panelOpen ? 'Collapse panel' : 'Expand panel'}
             >
+              {panelOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
+            </Button>
+
+            <div className="w-px h-5 bg-white/10 mx-1" />
+
+            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'desktop' && 'text-white bg-white/10')} onClick={() => setDevice('desktop')} title="Desktop">
               <Monitor className="w-3.5 h-3.5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'mobile' && 'text-white bg-white/10')}
-              onClick={() => setDevice('mobile')}
-              title="Mobile"
-            >
+            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'mobile' && 'text-white bg-white/10')} onClick={() => setDevice('mobile')} title="Mobile">
               <Smartphone className="w-3.5 h-3.5" />
             </Button>
 
@@ -291,13 +328,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
 
             <div className="w-px h-5 bg-white/10 mx-1" />
 
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={cn('text-white/60 hover:text-white hover:bg-white/10', preview && 'text-blue-400 bg-white/10')}
-              onClick={togglePreview}
-              title="Preview"
-            >
+            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', preview && 'text-blue-400 bg-white/10')} onClick={togglePreview} title="Preview">
               <Eye className="w-3.5 h-3.5" />
             </Button>
             <Button variant="ghost" size="icon-xs" className="text-white/60 hover:text-white hover:bg-white/10" onClick={toggleCode} title="View Code">
@@ -307,11 +338,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
 
           <div className="flex items-center gap-1.5">
             {onSave && (
-              <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3"
-                onClick={onSave}
-                disabled={saving}
-              >
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3" onClick={onSave} disabled={saving}>
                 <Save className="w-3 h-3 mr-1" />
                 {saving ? 'Saving...' : 'Save'}
               </Button>
@@ -321,49 +348,106 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
 
         {/* Main editor area */}
         <div className="flex flex-1 min-h-0">
-          {/* Left panel - Blocks / Layers */}
-          <div className="w-[220px] bg-white border-r border-gray-200 flex flex-col shrink-0">
-            {/* Panel tabs */}
-            <div className="flex border-b border-gray-200">
-              <button
-                className={cn(
-                  'flex-1 py-2 text-[11px] font-medium transition-colors flex items-center justify-center gap-1',
-                  activePanel === 'blocks' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
-                )}
-                onClick={() => setActivePanel('blocks')}
-              >
-                <LayoutGrid className="w-3 h-3" />
-                Blocks
-              </button>
-              <button
-                className={cn(
-                  'flex-1 py-2 text-[11px] font-medium transition-colors flex items-center justify-center gap-1',
-                  activePanel === 'layers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
-                )}
-                onClick={() => setActivePanel('layers')}
-              >
-                <Layers className="w-3 h-3" />
-                Layers
-              </button>
-              <button
-                className={cn(
-                  'flex-1 py-2 text-[11px] font-medium transition-colors flex items-center justify-center gap-1',
-                  activePanel === 'styles' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
-                )}
-                onClick={() => setActivePanel('styles')}
-              >
-                <Palette className="w-3 h-3" />
-                Styles
-              </button>
-            </div>
+          {/* Left panel */}
+          {panelOpen && (
+            <div className="w-[240px] bg-white border-r border-gray-200 flex flex-col shrink-0">
+              {/* Panel tabs */}
+              <div className="flex border-b border-gray-200 shrink-0">
+                {panelTabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    className={cn(
+                      'flex-1 py-2 text-[10px] font-medium transition-colors flex items-center justify-center gap-1',
+                      activePanel === tab.key ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
+                    )}
+                    onClick={() => setActivePanel(tab.key)}
+                  >
+                    <tab.icon className="w-3 h-3" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto">
-              {activePanel === 'blocks' && renderBlocksPanel()}
-              {activePanel === 'styles' && renderStylesPanel()}
-              {activePanel === 'layers' && renderLayersPanel()}
+              {/* Panel content */}
+              <div className="flex-1 overflow-y-auto">
+                {activePanel === 'blocks' && (
+                  <div>
+                    {/* Collapsible sections for blocks */}
+                    {[
+                      { name: 'Layout', desc: 'Sections & columns' },
+                      { name: 'Content', desc: 'Text, images, buttons' },
+                      { name: 'Social', desc: 'Social links & icons' },
+                      { name: 'Navigation', desc: 'Navbars & menus' },
+                    ].map(section => (
+                      <div key={section.name}>
+                        <button
+                          className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 border-b border-gray-100"
+                          onClick={() => toggleSection(section.name)}
+                        >
+                          {collapsedSections[section.name]
+                            ? <ChevronRight className="w-3 h-3 text-gray-400" />
+                            : <ChevronDown className="w-3 h-3 text-gray-400" />
+                          }
+                          {section.name}
+                          <span className="text-[9px] text-gray-400 font-normal ml-auto">{section.desc}</span>
+                        </button>
+                        {!collapsedSections[section.name] && (
+                          <div id={`gjs-blocks-${section.name.toLowerCase()}`} className="p-1" />
+                        )}
+                      </div>
+                    ))}
+                    {/* Fallback: full blocks container */}
+                    <div id="gjs-blocks-container" className="p-1" />
+                  </div>
+                )}
+
+                {activePanel === 'images' && (
+                  <div className="p-3 space-y-3">
+                    {/* Upload area */}
+                    <label className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+                      <Image className="w-6 h-6 text-gray-400" />
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        {uploading ? 'Uploading...' : 'Click or drag to upload'}
+                      </span>
+                      <span className="text-[9px] text-gray-400">PNG, JPG, GIF, WebP up to 25MB</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e.target.files)}
+                        disabled={uploading}
+                      />
+                    </label>
+
+                    {/* Image grid */}
+                    {uploadedImages.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {uploadedImages.map(img => (
+                          <button
+                            key={img.id}
+                            className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 hover:ring-2 hover:ring-blue-200 transition-all"
+                            onClick={() => insertImage(img.url)}
+                            title={`Insert ${img.filename}`}
+                          >
+                            <img src={img.url} alt={img.filename} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <span className="text-white text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">Insert</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-400 text-center py-4">No images uploaded yet</p>
+                    )}
+                  </div>
+                )}
+
+                {activePanel === 'styles' && <div id="gjs-styles-container" className="p-2 text-xs" />}
+                {activePanel === 'layers' && <div id="gjs-layers-container" className="p-2 text-xs" />}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Canvas */}
           <div className="flex-1 min-w-0 relative" ref={containerRef} />
