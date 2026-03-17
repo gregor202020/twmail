@@ -1,428 +1,551 @@
--- TWMail: Initial Database Schema
--- All tables, indexes, extensions, and triggers.
-
 -- ============================================================================
+-- 001_initial_schema.sql
+-- Complete PostgreSQL schema for Third Wave Mail
+-- ============================================================================
+
+BEGIN;
+
+-- --------------------------------------------------------------------------
 -- Extensions
--- ============================================================================
+-- --------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
--- Note: pg_partman and pg_cron require superuser and are installed separately
--- in production. For dev, partitioned tables use a default partition.
 
--- ============================================================================
--- users (dashboard access)
--- ============================================================================
-CREATE TABLE users (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    email           citext NOT NULL UNIQUE,
-    password_hash   text NOT NULL,
-    name            text NOT NULL,
-    role            smallint NOT NULL DEFAULT 2,
-    -- 1=admin, 2=editor, 3=viewer
-    last_login_at   timestamptz,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- api_keys
--- ============================================================================
-CREATE TABLE api_keys (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id         bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name            text NOT NULL,
-    key_prefix      text NOT NULL,
-    key_hash        text NOT NULL,
-    scopes          text[] NOT NULL DEFAULT '{read}',
-    last_used_at    timestamptz,
-    expires_at      timestamptz,
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_api_keys_user ON api_keys (user_id);
-CREATE INDEX idx_api_keys_prefix ON api_keys (key_prefix);
-
--- ============================================================================
--- contacts
--- ============================================================================
-CREATE TABLE contacts (
-    id                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    email             citext NOT NULL UNIQUE,
-    status            smallint NOT NULL DEFAULT 1,
-    -- 1=active, 2=unsubscribed, 3=bounced, 4=complained, 5=cleaned
-    first_name        text,
-    last_name         text,
-    phone             text,
-    company           text,
-    city              text,
-    country           text,
-    timezone          text,
-    custom_fields     jsonb NOT NULL DEFAULT '{}'::jsonb,
-    source            text,
-    engagement_score  smallint DEFAULT 0,
-    engagement_tier   smallint DEFAULT 0,
-    last_open_at      timestamptz,
-    last_click_at     timestamptz,
-    last_activity_at  timestamptz,
-    subscribed_at     timestamptz,
-    unsubscribed_at   timestamptz,
-    created_at        timestamptz NOT NULL DEFAULT now(),
-    updated_at        timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_contacts_status ON contacts (id) WHERE status = 1;
-CREATE INDEX idx_contacts_custom_gin ON contacts USING gin (custom_fields jsonb_path_ops);
-CREATE INDEX idx_contacts_engagement ON contacts (engagement_tier, engagement_score DESC) WHERE status = 1;
-CREATE INDEX idx_contacts_last_activity ON contacts (last_activity_at DESC NULLS LAST) WHERE status = 1;
-CREATE INDEX idx_contacts_created ON contacts (created_at DESC);
-CREATE INDEX idx_contacts_email ON contacts (email);
-
--- ============================================================================
--- lists
--- ============================================================================
-CREATE TABLE lists (
-    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name        text NOT NULL,
-    description text,
-    type        smallint NOT NULL DEFAULT 1,
-    -- 1=public, 2=private
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    updated_at  timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- contact_lists (junction)
--- ============================================================================
-CREATE TABLE contact_lists (
-    contact_id  bigint NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-    list_id     bigint NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
-    status      smallint NOT NULL DEFAULT 1,
-    -- 1=confirmed, 2=unconfirmed, 3=unsubscribed
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (contact_id, list_id)
-);
-
-CREATE INDEX idx_contact_lists_list ON contact_lists (list_id, contact_id) WHERE status = 1;
-
--- ============================================================================
--- segments
--- ============================================================================
-CREATE TABLE segments (
-    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name        text NOT NULL,
-    type        smallint NOT NULL DEFAULT 1,
-    -- 1=dynamic, 2=static
-    rules       jsonb,
-    description text,
-    cached_count integer,
-    cached_at   timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    updated_at  timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- contact_segments (junction for static segments)
--- ============================================================================
-CREATE TABLE contact_segments (
-    contact_id  bigint NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-    segment_id  bigint NOT NULL REFERENCES segments(id) ON DELETE CASCADE,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (contact_id, segment_id)
-);
-
-CREATE INDEX idx_contact_segments_segment ON contact_segments (segment_id, contact_id);
-
--- ============================================================================
--- templates
--- ============================================================================
-CREATE TABLE templates (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name            text NOT NULL,
-    category        text,
-    content_html    text,
-    content_json    jsonb NOT NULL DEFAULT '{}'::jsonb,
-    thumbnail_url   text,
-    is_default      boolean DEFAULT false,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- campaigns
--- ============================================================================
-CREATE TABLE campaigns (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name            text NOT NULL,
-    status          smallint NOT NULL DEFAULT 1,
-    -- 1=draft, 2=scheduled, 3=sending, 4=sent, 5=paused, 6=cancelled
-    subject         text,
-    preview_text    text,
-    from_name       text NOT NULL DEFAULT 'Third Wave BBQ',
-    from_email      text NOT NULL DEFAULT 'news@thirdwavebbq.com.au',
-    reply_to        text,
-    template_id     bigint REFERENCES templates(id),
-    content_html    text,
-    content_json    jsonb,
-    segment_id      bigint REFERENCES segments(id),
-    list_id         bigint REFERENCES lists(id),
-    scheduled_at    timestamptz,
-    timezone        text DEFAULT 'Australia/Melbourne',
-    send_started_at timestamptz,
-    send_completed_at timestamptz,
-    ab_test_enabled boolean NOT NULL DEFAULT false,
-    ab_test_config  jsonb,
-    resend_enabled  boolean NOT NULL DEFAULT false,
-    resend_config   jsonb,
-    resend_of       bigint REFERENCES campaigns(id),
-    total_sent          integer DEFAULT 0,
-    total_delivered     integer DEFAULT 0,
-    total_opens         integer DEFAULT 0,
-    total_human_opens   integer DEFAULT 0,
-    total_clicks        integer DEFAULT 0,
-    total_human_clicks  integer DEFAULT 0,
-    total_bounces       integer DEFAULT 0,
-    total_complaints    integer DEFAULT 0,
-    total_unsubscribes  integer DEFAULT 0,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_campaigns_status ON campaigns (status, scheduled_at DESC);
-
--- ============================================================================
--- campaign_variants
--- ============================================================================
-CREATE TABLE campaign_variants (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    campaign_id     bigint NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-    variant_name    text NOT NULL,
-    subject         text NOT NULL,
-    preview_text    text,
-    content_html    text,
-    content_json    jsonb,
-    percentage      smallint NOT NULL,
-    is_winner       boolean DEFAULT false,
-    win_probability real,
-    total_sent          integer DEFAULT 0,
-    total_opens         integer DEFAULT 0,
-    total_human_opens   integer DEFAULT 0,
-    total_clicks        integer DEFAULT 0,
-    total_human_clicks  integer DEFAULT 0,
-    unique_clicks       integer DEFAULT 0,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_variants_campaign ON campaign_variants (campaign_id);
-
--- ============================================================================
--- events (partitioned by month)
--- ============================================================================
-CREATE TABLE events (
-    id              bigint GENERATED ALWAYS AS IDENTITY,
-    event_type      smallint NOT NULL,
-    -- 1=sent, 2=delivered, 3=open, 4=click, 5=hard_bounce,
-    -- 6=soft_bounce, 7=complaint, 8=unsubscribe, 9=machine_open
-    contact_id      bigint NOT NULL,
-    campaign_id     bigint,
-    variant_id      bigint,
-    message_id      uuid,
-    event_time      timestamptz NOT NULL,
-    metadata        jsonb,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (id, event_time)
-) PARTITION BY RANGE (event_time);
-
-CREATE TABLE events_default PARTITION OF events DEFAULT;
-
-CREATE INDEX idx_events_campaign_stats ON events (campaign_id, event_type, event_time);
-CREATE INDEX idx_events_contact_timeline ON events (contact_id, event_time DESC);
-CREATE INDEX idx_events_message ON events (message_id, event_type);
-CREATE INDEX idx_events_bounces ON events (event_time DESC, contact_id) WHERE event_type IN (5, 6, 7);
-
--- ============================================================================
--- campaign_stats_daily
--- ============================================================================
-CREATE TABLE campaign_stats_daily (
-    campaign_id     bigint NOT NULL,
-    variant_id      bigint NOT NULL DEFAULT 0,
-    event_type      smallint NOT NULL,
-    event_date      date NOT NULL,
-    total_count     integer NOT NULL DEFAULT 0,
-    unique_contacts integer NOT NULL DEFAULT 0,
-    PRIMARY KEY (campaign_id, event_type, event_date, variant_id)
-);
-
--- ============================================================================
--- messages
--- ============================================================================
-CREATE TABLE messages (
-    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    campaign_id     bigint NOT NULL REFERENCES campaigns(id),
-    variant_id      bigint REFERENCES campaign_variants(id),
-    contact_id      bigint NOT NULL REFERENCES contacts(id),
-    status          smallint NOT NULL DEFAULT 1,
-    -- 1=queued, 2=sent, 3=delivered, 4=opened, 5=clicked,
-    -- 6=bounced, 7=complained, 8=unsubscribed
-    ses_message_id  text,
-    sent_at         timestamptz,
-    delivered_at    timestamptz,
-    first_open_at   timestamptz,
-    first_click_at  timestamptz,
-    is_machine_open boolean DEFAULT false,
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_messages_campaign_contact ON messages (campaign_id, contact_id);
-CREATE INDEX idx_messages_ses ON messages (ses_message_id);
-CREATE INDEX idx_messages_status ON messages (campaign_id, status);
-
--- ============================================================================
--- automations
--- ============================================================================
-CREATE TABLE automations (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name            text NOT NULL,
-    type            smallint NOT NULL,
-    -- 1=resend_non_openers, 2=drip_sequence, 3=engagement_trigger
-    trigger_config  jsonb NOT NULL,
-    enabled         boolean NOT NULL DEFAULT true,
-    last_run_at     timestamptz,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE automation_steps (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    automation_id   bigint NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
-    step_order      smallint NOT NULL,
-    action          smallint NOT NULL,
-    -- 1=send_email, 2=wait, 3=condition, 4=update_contact
-    config          jsonb NOT NULL,
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_automation_steps_automation ON automation_steps (automation_id, step_order);
-
-CREATE TABLE automation_log (
-    id              bigint GENERATED ALWAYS AS IDENTITY,
-    automation_id   bigint NOT NULL,
-    contact_id      bigint NOT NULL,
-    step_id         bigint,
-    status          smallint NOT NULL,
-    -- 1=started, 2=completed, 3=failed, 4=skipped
-    metadata        jsonb,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (id, created_at)
-) PARTITION BY RANGE (created_at);
-
-CREATE TABLE automation_log_default PARTITION OF automation_log DEFAULT;
-
--- ============================================================================
--- assets
--- ============================================================================
-CREATE TABLE assets (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    filename        text NOT NULL,
-    original_name   text NOT NULL,
-    mime_type       text NOT NULL,
-    size_bytes      bigint NOT NULL,
-    storage_type    smallint NOT NULL DEFAULT 1,
-    -- 1=local, 2=s3
-    url             text NOT NULL,
-    thumbnail_url   text,
-    campaign_id     bigint REFERENCES campaigns(id),
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- imports
--- ============================================================================
-CREATE TABLE imports (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    type            smallint NOT NULL,
-    -- 1=paste, 2=csv, 3=api
-    status          smallint NOT NULL DEFAULT 1,
-    -- 1=processing, 2=completed, 3=failed
-    total_rows      integer DEFAULT 0,
-    new_contacts    integer DEFAULT 0,
-    updated_contacts integer DEFAULT 0,
-    skipped         integer DEFAULT 0,
-    mapping_config  jsonb,
-    mapping_preset  text,
-    errors          jsonb,
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    completed_at    timestamptz
-);
-
--- ============================================================================
--- webhook_endpoints
--- ============================================================================
-CREATE TABLE webhook_endpoints (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    url             text NOT NULL,
-    secret          text NOT NULL,
-    events          text[] NOT NULL,
-    active          boolean NOT NULL DEFAULT true,
-    last_triggered_at timestamptz,
-    failure_count   integer DEFAULT 0,
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
--- ============================================================================
--- webhook_deliveries
--- ============================================================================
-CREATE TABLE webhook_deliveries (
-    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    endpoint_id     bigint NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
-    event_type      text NOT NULL,
-    payload         jsonb NOT NULL,
-    status          smallint NOT NULL DEFAULT 1,
-    -- 1=pending, 2=delivered, 3=failed
-    response_code   smallint,
-    response_body   text,
-    attempts        smallint DEFAULT 0,
-    next_retry_at   timestamptz,
-    created_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_webhook_deliveries_endpoint ON webhook_deliveries (endpoint_id, created_at DESC);
-
--- ============================================================================
--- updated_at trigger function
--- ============================================================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- --------------------------------------------------------------------------
+-- Utility: auto-update updated_at trigger function
+-- --------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
+  NEW.updated_at = NOW();
+  RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_lists_updated_at BEFORE UPDATE ON lists
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_segments_updated_at BEFORE UPDATE ON segments
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_campaigns_updated_at BEFORE UPDATE ON campaigns
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_campaign_variants_updated_at BEFORE UPDATE ON campaign_variants
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_templates_updated_at BEFORE UPDATE ON templates
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_automations_updated_at BEFORE UPDATE ON automations
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- ============================================================================
--- Seed: default admin user (password: "admin123" -- CHANGE IN PRODUCTION)
--- bcrypt hash of "admin123" with 12 rounds
--- ============================================================================
-INSERT INTO users (email, password_hash, name, role) VALUES (
-    'admin@twmail.local',
-    '$2b$12$LJ3m4ys3LzPGmOgmByF6Nu/vrGYHfkBsGMpjHXHxSwPBmhqOC7hWu',
-    'Admin',
-    1
+-- --------------------------------------------------------------------------
+-- users
+-- --------------------------------------------------------------------------
+CREATE TABLE users (
+  id            SERIAL PRIMARY KEY,
+  email         CITEXT NOT NULL UNIQUE,
+  password_hash TEXT   NOT NULL DEFAULT '',
+  name          TEXT   NOT NULL DEFAULT '',
+  role          SMALLINT NOT NULL DEFAULT 3,
+  last_login_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TRIGGER trg_users_updated_at
+  BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- api_keys
+-- --------------------------------------------------------------------------
+CREATE TABLE api_keys (
+  id           SERIAL PRIMARY KEY,
+  user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL DEFAULT '',
+  key_prefix   TEXT NOT NULL DEFAULT '',
+  key_hash     TEXT NOT NULL DEFAULT '',
+  scopes       TEXT[] NOT NULL DEFAULT '{}',
+  expires_at   TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_api_keys_prefix  ON api_keys (key_prefix);
+CREATE INDEX idx_api_keys_user_id ON api_keys (user_id);
+
+CREATE TRIGGER trg_api_keys_updated_at
+  BEFORE UPDATE ON api_keys
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- contacts
+-- --------------------------------------------------------------------------
+CREATE TABLE contacts (
+  id               SERIAL PRIMARY KEY,
+  email            CITEXT NOT NULL UNIQUE,
+  first_name       TEXT NOT NULL DEFAULT '',
+  last_name        TEXT NOT NULL DEFAULT '',
+  phone            TEXT NOT NULL DEFAULT '',
+  company          TEXT NOT NULL DEFAULT '',
+  city             TEXT NOT NULL DEFAULT '',
+  country          TEXT NOT NULL DEFAULT '',
+  timezone         TEXT NOT NULL DEFAULT '',
+  status           SMALLINT NOT NULL DEFAULT 1,
+  custom_fields    JSONB NOT NULL DEFAULT '{}',
+  source           TEXT NOT NULL DEFAULT '',
+  engagement_score REAL NOT NULL DEFAULT 0,
+  engagement_tier  SMALLINT,
+  last_open_at     TIMESTAMPTZ,
+  last_click_at    TIMESTAMPTZ,
+  last_activity_at TIMESTAMPTZ,
+  subscribed_at    TIMESTAMPTZ,
+  unsubscribed_at  TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_contacts_status     ON contacts (status);
+CREATE INDEX idx_contacts_email      ON contacts (email);
+CREATE INDEX idx_contacts_company    ON contacts (company);
+CREATE INDEX idx_contacts_country    ON contacts (country);
+CREATE INDEX idx_contacts_engagement ON contacts (engagement_score);
+CREATE INDEX idx_contacts_created_at ON contacts (created_at);
+
+CREATE TRIGGER trg_contacts_updated_at
+  BEFORE UPDATE ON contacts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- lists
+-- --------------------------------------------------------------------------
+CREATE TABLE lists (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  type        SMALLINT NOT NULL DEFAULT 1,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_lists_updated_at
+  BEFORE UPDATE ON lists
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- contact_lists
+-- --------------------------------------------------------------------------
+CREATE TABLE contact_lists (
+  contact_id INT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  list_id    INT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+  status     SMALLINT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (contact_id, list_id)
+);
+
+-- --------------------------------------------------------------------------
+-- segments
+-- --------------------------------------------------------------------------
+CREATE TABLE segments (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL DEFAULT '',
+  description  TEXT NOT NULL DEFAULT '',
+  type         SMALLINT NOT NULL DEFAULT 1,
+  rules        JSONB NOT NULL DEFAULT '{}',
+  cached_count INT NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_segments_updated_at
+  BEFORE UPDATE ON segments
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- contact_segments
+-- --------------------------------------------------------------------------
+CREATE TABLE contact_segments (
+  contact_id INT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  segment_id INT NOT NULL REFERENCES segments(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (contact_id, segment_id)
+);
+
+-- --------------------------------------------------------------------------
+-- templates
+-- --------------------------------------------------------------------------
+CREATE TABLE templates (
+  id            SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL DEFAULT '',
+  category      TEXT NOT NULL DEFAULT '',
+  content_html  TEXT NOT NULL DEFAULT '',
+  content_json  JSONB,
+  thumbnail_url TEXT NOT NULL DEFAULT '',
+  is_default    BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_templates_updated_at
+  BEFORE UPDATE ON templates
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- campaigns
+-- --------------------------------------------------------------------------
+CREATE TABLE campaigns (
+  id                      SERIAL PRIMARY KEY,
+  name                    TEXT NOT NULL DEFAULT '',
+  status                  SMALLINT NOT NULL DEFAULT 1,
+  subject                 TEXT NOT NULL DEFAULT '',
+  preview_text            TEXT NOT NULL DEFAULT '',
+  from_name               TEXT NOT NULL DEFAULT '',
+  from_email              TEXT NOT NULL DEFAULT '',
+  reply_to                TEXT NOT NULL DEFAULT '',
+  template_id             INT REFERENCES templates(id),
+  content_html            TEXT NOT NULL DEFAULT '',
+  content_json            JSONB,
+  segment_id              INT REFERENCES segments(id),
+  list_id                 INT REFERENCES lists(id),
+  ab_test_enabled         BOOLEAN NOT NULL DEFAULT FALSE,
+  ab_test_config          JSONB,
+  resend_enabled          BOOLEAN NOT NULL DEFAULT FALSE,
+  resend_config           JSONB,
+  resend_of               INT REFERENCES campaigns(id),
+  tags                    TEXT[] NOT NULL DEFAULT '{}',
+  utm_enabled             BOOLEAN NOT NULL DEFAULT FALSE,
+  utm_source              TEXT NOT NULL DEFAULT '',
+  utm_medium              TEXT NOT NULL DEFAULT '',
+  utm_campaign            TEXT NOT NULL DEFAULT '',
+  utm_content             TEXT NOT NULL DEFAULT '',
+  ga_tracking             BOOLEAN NOT NULL DEFAULT FALSE,
+  tracking_domain         TEXT NOT NULL DEFAULT '',
+  send_time_optimization  BOOLEAN NOT NULL DEFAULT FALSE,
+  total_sent              INT NOT NULL DEFAULT 0,
+  total_delivered         INT NOT NULL DEFAULT 0,
+  total_opens             INT NOT NULL DEFAULT 0,
+  total_human_opens       INT NOT NULL DEFAULT 0,
+  total_clicks            INT NOT NULL DEFAULT 0,
+  total_human_clicks      INT NOT NULL DEFAULT 0,
+  total_bounces           INT NOT NULL DEFAULT 0,
+  total_complaints        INT NOT NULL DEFAULT 0,
+  total_unsubscribes      INT NOT NULL DEFAULT 0,
+  scheduled_at            TIMESTAMPTZ,
+  timezone                TEXT NOT NULL DEFAULT '',
+  send_started_at         TIMESTAMPTZ,
+  send_completed_at       TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_campaigns_status    ON campaigns (status);
+CREATE INDEX idx_campaigns_scheduled ON campaigns (scheduled_at) WHERE scheduled_at IS NOT NULL;
+
+CREATE TRIGGER trg_campaigns_updated_at
+  BEFORE UPDATE ON campaigns
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- campaign_variants
+-- --------------------------------------------------------------------------
+CREATE TABLE campaign_variants (
+  id                 SERIAL PRIMARY KEY,
+  campaign_id        INT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  variant_name       TEXT NOT NULL DEFAULT '',
+  subject            TEXT NOT NULL DEFAULT '',
+  content_html       TEXT NOT NULL DEFAULT '',
+  content_json       JSONB,
+  percentage         SMALLINT NOT NULL DEFAULT 50,
+  is_winner          BOOLEAN NOT NULL DEFAULT FALSE,
+  win_probability    REAL,
+  total_sent         INT NOT NULL DEFAULT 0,
+  total_delivered    INT NOT NULL DEFAULT 0,
+  total_opens        INT NOT NULL DEFAULT 0,
+  total_human_opens  INT NOT NULL DEFAULT 0,
+  total_clicks       INT NOT NULL DEFAULT 0,
+  total_human_clicks INT NOT NULL DEFAULT 0,
+  total_bounces      INT NOT NULL DEFAULT 0,
+  total_complaints   INT NOT NULL DEFAULT 0,
+  total_unsubscribes INT NOT NULL DEFAULT 0,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_campaign_variants_updated_at
+  BEFORE UPDATE ON campaign_variants
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- campaign_holdback_contacts
+-- --------------------------------------------------------------------------
+CREATE TABLE campaign_holdback_contacts (
+  campaign_id INT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  contact_id  INT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  PRIMARY KEY (campaign_id, contact_id)
+);
+
+-- --------------------------------------------------------------------------
+-- messages
+-- --------------------------------------------------------------------------
+CREATE TABLE messages (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id     INT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  variant_id      INT REFERENCES campaign_variants(id) ON DELETE SET NULL,
+  contact_id      INT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  status          SMALLINT NOT NULL DEFAULT 1,
+  ses_message_id  TEXT NOT NULL DEFAULT '',
+  sent_at         TIMESTAMPTZ,
+  delivered_at    TIMESTAMPTZ,
+  first_open_at   TIMESTAMPTZ,
+  first_click_at  TIMESTAMPTZ,
+  is_machine_open BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (campaign_id, contact_id)
+);
+
+CREATE INDEX idx_messages_campaign ON messages (campaign_id);
+CREATE INDEX idx_messages_contact  ON messages (contact_id);
+CREATE INDEX idx_messages_ses      ON messages (ses_message_id) WHERE ses_message_id != '';
+CREATE INDEX idx_messages_status   ON messages (status);
+
+CREATE TRIGGER trg_messages_updated_at
+  BEFORE UPDATE ON messages
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- events (partitioned by event_time)
+-- --------------------------------------------------------------------------
+CREATE TABLE events (
+  id          BIGSERIAL,
+  event_type  SMALLINT NOT NULL,
+  contact_id  INT,
+  campaign_id INT,
+  variant_id  INT,
+  message_id  UUID,
+  event_time  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata    JSONB,
+  PRIMARY KEY (id, event_time)
+) PARTITION BY RANGE (event_time);
+
+-- Indexes on the parent table (inherited by partitions)
+CREATE INDEX idx_events_campaign_stats   ON events (campaign_id, event_type, event_time);
+CREATE INDEX idx_events_contact_timeline ON events (contact_id, event_time DESC);
+CREATE INDEX idx_events_message          ON events (message_id);
+
+-- Unique partial index for bounce/complaint/unsubscribe dedup
+CREATE UNIQUE INDEX idx_events_bounce_complaint_dedup
+  ON events (message_id, event_type)
+  WHERE event_type IN (5, 6, 7);
+
+-- Create monthly partitions 2025-2027
+DO $$
+DECLARE
+  y INT;
+  m INT;
+  start_date TEXT;
+  end_date   TEXT;
+  part_name  TEXT;
+BEGIN
+  FOR y IN 2025..2027 LOOP
+    FOR m IN 1..12 LOOP
+      start_date := FORMAT('%s-%s-01', y, LPAD(m::TEXT, 2, '0'));
+      IF m = 12 THEN
+        end_date := FORMAT('%s-01-01', y + 1);
+      ELSE
+        end_date := FORMAT('%s-%s-01', y, LPAD((m + 1)::TEXT, 2, '0'));
+      END IF;
+      part_name := FORMAT('events_y%sm%s', y, LPAD(m::TEXT, 2, '0'));
+
+      EXECUTE FORMAT(
+        'CREATE TABLE %I PARTITION OF events FOR VALUES FROM (%L) TO (%L)',
+        part_name, start_date, end_date
+      );
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+-- --------------------------------------------------------------------------
+-- campaign_stats_daily
+-- --------------------------------------------------------------------------
+CREATE TABLE campaign_stats_daily (
+  id              SERIAL PRIMARY KEY,
+  campaign_id     INT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  variant_id      INT REFERENCES campaign_variants(id) ON DELETE CASCADE,
+  event_type      SMALLINT NOT NULL,
+  event_date      DATE NOT NULL,
+  total_count     INT NOT NULL DEFAULT 0,
+  unique_contacts INT NOT NULL DEFAULT 0,
+  UNIQUE (campaign_id, variant_id, event_type, event_date)
+);
+
+-- --------------------------------------------------------------------------
+-- automations
+-- --------------------------------------------------------------------------
+CREATE TABLE automations (
+  id             SERIAL PRIMARY KEY,
+  name           TEXT NOT NULL DEFAULT '',
+  type           SMALLINT NOT NULL,
+  trigger_config JSONB NOT NULL DEFAULT '{}',
+  enabled        BOOLEAN NOT NULL DEFAULT FALSE,
+  last_run_at    TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_automations_updated_at
+  BEFORE UPDATE ON automations
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- automation_steps
+-- --------------------------------------------------------------------------
+CREATE TABLE automation_steps (
+  id            SERIAL PRIMARY KEY,
+  automation_id INT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  step_order    INT NOT NULL DEFAULT 0,
+  action        SMALLINT NOT NULL,
+  config        JSONB NOT NULL DEFAULT '{}',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_automation_steps_updated_at
+  BEFORE UPDATE ON automation_steps
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- automation_log (partitioned by executed_at)
+-- --------------------------------------------------------------------------
+CREATE TABLE automation_log (
+  id            BIGSERIAL,
+  automation_id INT,
+  step_id       INT,
+  contact_id    INT,
+  status        SMALLINT NOT NULL DEFAULT 1,
+  result        JSONB,
+  executed_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (id, executed_at)
+) PARTITION BY RANGE (executed_at);
+
+CREATE INDEX idx_automation_log_automation ON automation_log (automation_id, executed_at DESC);
+CREATE INDEX idx_automation_log_contact    ON automation_log (contact_id, executed_at DESC);
+
+-- Create monthly partitions 2025-2027
+DO $$
+DECLARE
+  y INT;
+  m INT;
+  start_date TEXT;
+  end_date   TEXT;
+  part_name  TEXT;
+BEGIN
+  FOR y IN 2025..2027 LOOP
+    FOR m IN 1..12 LOOP
+      start_date := FORMAT('%s-%s-01', y, LPAD(m::TEXT, 2, '0'));
+      IF m = 12 THEN
+        end_date := FORMAT('%s-01-01', y + 1);
+      ELSE
+        end_date := FORMAT('%s-%s-01', y, LPAD((m + 1)::TEXT, 2, '0'));
+      END IF;
+      part_name := FORMAT('automation_log_y%sm%s', y, LPAD(m::TEXT, 2, '0'));
+
+      EXECUTE FORMAT(
+        'CREATE TABLE %I PARTITION OF automation_log FOR VALUES FROM (%L) TO (%L)',
+        part_name, start_date, end_date
+      );
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+-- --------------------------------------------------------------------------
+-- assets
+-- --------------------------------------------------------------------------
+CREATE TABLE assets (
+  id            SERIAL PRIMARY KEY,
+  filename      TEXT NOT NULL DEFAULT '',
+  original_name TEXT NOT NULL DEFAULT '',
+  mime_type     TEXT NOT NULL DEFAULT '',
+  size_bytes    BIGINT NOT NULL DEFAULT 0,
+  storage_type  SMALLINT NOT NULL DEFAULT 1,
+  url           TEXT NOT NULL DEFAULT '',
+  thumbnail_url TEXT NOT NULL DEFAULT '',
+  campaign_id   INT REFERENCES campaigns(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- --------------------------------------------------------------------------
+-- imports
+-- --------------------------------------------------------------------------
+CREATE TABLE imports (
+  id               SERIAL PRIMARY KEY,
+  type             SMALLINT NOT NULL,
+  status           SMALLINT NOT NULL DEFAULT 1,
+  total_rows       INT NOT NULL DEFAULT 0,
+  new_contacts     INT NOT NULL DEFAULT 0,
+  updated_contacts INT NOT NULL DEFAULT 0,
+  skipped          INT NOT NULL DEFAULT 0,
+  mapping_config   JSONB,
+  errors           JSONB NOT NULL DEFAULT '[]',
+  list_id          INT REFERENCES lists(id) ON DELETE SET NULL,
+  update_existing  BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_imports_updated_at
+  BEFORE UPDATE ON imports
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- webhook_endpoints
+-- --------------------------------------------------------------------------
+CREATE TABLE webhook_endpoints (
+  id                SERIAL PRIMARY KEY,
+  url               TEXT NOT NULL DEFAULT '',
+  secret            TEXT NOT NULL DEFAULT '',
+  events            TEXT[] NOT NULL DEFAULT '{}',
+  active            BOOLEAN NOT NULL DEFAULT TRUE,
+  last_triggered_at TIMESTAMPTZ,
+  failure_count     INT NOT NULL DEFAULT 0,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_webhook_endpoints_updated_at
+  BEFORE UPDATE ON webhook_endpoints
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- webhook_deliveries
+-- --------------------------------------------------------------------------
+CREATE TABLE webhook_deliveries (
+  id            SERIAL PRIMARY KEY,
+  endpoint_id   INT NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+  event_type    TEXT NOT NULL DEFAULT '',
+  payload       JSONB NOT NULL DEFAULT '{}',
+  status        SMALLINT NOT NULL DEFAULT 1,
+  response_code INT,
+  response_body TEXT NOT NULL DEFAULT '',
+  attempts      INT NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_webhook_deliveries_endpoint ON webhook_deliveries (endpoint_id);
+CREATE INDEX idx_webhook_deliveries_status   ON webhook_deliveries (status) WHERE status = 1;
+
+CREATE TRIGGER trg_webhook_deliveries_updated_at
+  BEFORE UPDATE ON webhook_deliveries
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- --------------------------------------------------------------------------
+-- settings (singleton row)
+-- --------------------------------------------------------------------------
+CREATE TABLE settings (
+  id                   INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  organization_name    TEXT NOT NULL DEFAULT '',
+  default_sender_email TEXT NOT NULL DEFAULT '',
+  default_sender_name  TEXT NOT NULL DEFAULT '',
+  timezone             TEXT NOT NULL DEFAULT 'UTC',
+  physical_address     TEXT NOT NULL DEFAULT '',
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+
+CREATE TRIGGER trg_settings_updated_at
+  BEFORE UPDATE ON settings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+COMMIT;

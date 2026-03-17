@@ -19,22 +19,15 @@ export default tseslint.config(
       },
     },
     rules: {
-      // Phase 7 enforcement: async safety
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
-
-      // Enforced — all as-any escapes removed in Phase 8
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-call': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-argument': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
-
-      // Additional strict rules now enforced
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-
-      // Downgrade rules that produce noise in current codebase
       '@typescript-eslint/require-await': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-base-to-string': 'warn',

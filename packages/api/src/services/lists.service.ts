@@ -29,7 +29,7 @@ export async function createList(data: { name: string; description?: string; typ
     .insertInto('lists')
     .values({
       name: data.name,
-      description: data.description ?? null,
+      description: data.description,
       type: data.type ?? 1,
     })
     .returningAll()

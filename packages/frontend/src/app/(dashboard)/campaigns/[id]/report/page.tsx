@@ -14,7 +14,7 @@ import { DeliveryFunnel } from '@/components/campaigns/delivery-funnel';
 import { AbResults } from '@/components/campaigns/ab-results';
 import { DataTable, type Column } from '@/components/shared/data-table';
 import { StatCardSkeleton } from '@/components/shared/loading-skeleton';
-import { CampaignStatus } from '@twmail/shared/types';
+import { CampaignStatus } from '@/types';
 import type { Campaign, PaginationMeta } from '@/types';
 import { useState } from 'react';
 

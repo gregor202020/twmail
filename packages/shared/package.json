@@ -1,17 +1,10 @@
 {
   "name": "@twmail/shared",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js",
-    "./db": "./dist/db.js",
-    "./redis": "./dist/redis.js",
-    "./schema": "./dist/schema.js",
-    "./types": "./dist/types.js"
-  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch"
@@ -22,7 +15,7 @@
     "ioredis": "^5.4.0"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "@types/pg": "^8.11.0"
   }
 }

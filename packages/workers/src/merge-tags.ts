@@ -2,11 +2,20 @@ import type { Contact } from '@twmail/shared';
 
 const BASE_URL = process.env['BASE_URL'] ?? 'https://mail.thirdwavebbq.com.au';
 
-// Merge tag pattern: {{field_name}} or {{field_name|"fallback"}}
+/**
+ * Merge tag pattern: {{field_name}} or {{field_name|"fallback"}}
+ *
+ * Supported fields:
+ *   - Standard: first_name, last_name, email, company, phone, city, country
+ *   - Custom:   custom.field_name (reads from contact.custom_fields)
+ *   - URLs:     unsubscribe_url, preferences_url, webview_url
+ *
+ * Unknown tags resolve to empty string (or the fallback if provided).
+ */
 const MERGE_TAG_REGEX = /\{\{(\w+(?:\.\w+)?)(?:\|"([^"]*)")?\}\}/g;
 
-export function processMergeTags(html: string, contact: Contact, messageId: string): string {
-  return html.replace(MERGE_TAG_REGEX, (_match, field: string, fallback: string | undefined) => {
+export function processMergeTags(text: string, contact: Contact, messageId: string): string {
+  return text.replace(MERGE_TAG_REGEX, (_match, field: string, fallback: string | undefined) => {
     const value = resolveField(contact, field, messageId);
     if (value !== null && value !== undefined && value !== '') {
       return String(value);

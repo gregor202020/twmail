@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import { Toaster } from "sonner";
-import { Providers } from "./providers";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Toaster } from 'sonner';
+import { Providers } from './providers';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "TWMail",
-  description: "Email marketing platform for Third Wave BBQ",
+  title: 'Third Wave Mail',
+  description: 'Email marketing platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

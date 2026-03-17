@@ -12,8 +12,6 @@ COPY packages/frontend/ packages/frontend/
 
 RUN npm run build --workspace=packages/shared
 ENV API_URL=http://api:3000
-ARG NEXT_PUBLIC_SENTRY_DSN=""
-ENV NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
 RUN npm run build --workspace=packages/frontend
 
 FROM node:22-alpine
@@ -29,6 +27,5 @@ COPY --from=base /app/package.json /app/
 
 ENV NODE_ENV=production
 ENV API_URL=http://api:3000
-ENV SENTRY_DSN=""
 EXPOSE 3001
 CMD ["npx", "next", "start", "-p", "3001"]

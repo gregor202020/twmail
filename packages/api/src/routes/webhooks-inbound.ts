@@ -1,12 +1,27 @@
 import type { FastifyPluginAsync } from 'fastify';
 import crypto from 'node:crypto';
 import { getDb, ContactStatus, EventType, MessageStatus } from '@twmail/shared';
-import type { Kysely, InsertResult } from 'kysely';
+import type { Kysely } from 'kysely';
 import type { Database } from '@twmail/shared';
 
 // Fields used to build the signing string for SNS signature verification
-const NOTIFICATION_SIGNING_FIELDS = ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'];
-const SUBSCRIPTION_SIGNING_FIELDS = ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'];
+const NOTIFICATION_SIGNING_FIELDS = [
+  'Message',
+  'MessageId',
+  'Subject',
+  'Timestamp',
+  'TopicArn',
+  'Type',
+];
+const SUBSCRIPTION_SIGNING_FIELDS = [
+  'Message',
+  'MessageId',
+  'SubscribeURL',
+  'Timestamp',
+  'Token',
+  'TopicArn',
+  'Type',
+];
 
 // Cache for downloaded signing certificates (with TTL and max size)
 const CERT_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -32,7 +47,10 @@ function isValidSigningCertUrl(url: string): boolean {
 /**
  * Build the canonical signing string for an SNS message.
  */
-function buildSigningString(message: Record<string, unknown>, fields: string[]): string {
+function buildSigningString(
+  message: Record<string, unknown>,
+  fields: string[],
+): string {
   const parts: string[] = [];
   for (const field of fields) {
     if (field in message && message[field] != null) {
@@ -45,7 +63,9 @@ function buildSigningString(message: Record<string, unknown>, fields: string[]):
 /**
  * Verify the SNS message signature using the signing certificate.
  */
-async function verifySnsSignature(message: Record<string, unknown>): Promise<boolean> {
+async function verifySnsSignature(
+  message: Record<string, unknown>,
+): Promise<boolean> {
   const certUrl = message['SigningCertURL'] as string | undefined;
   const signature = message['Signature'] as string | undefined;
   const type = message['Type'] as string | undefined;
@@ -80,7 +100,10 @@ async function verifySnsSignature(message: Record<string, unknown>): Promise<boo
     }
   }
 
-  const fields = type === 'Notification' ? NOTIFICATION_SIGNING_FIELDS : SUBSCRIPTION_SIGNING_FIELDS;
+  const fields =
+    type === 'Notification'
+      ? NOTIFICATION_SIGNING_FIELDS
+      : SUBSCRIPTION_SIGNING_FIELDS;
   const signingString = buildSigningString(message, fields);
 
   try {
@@ -92,47 +115,9 @@ async function verifySnsSignature(message: Record<string, unknown>): Promise<boo
   }
 }
 
-/**
- * Insert a bounce/complaint event with idempotency guard.
- * Uses ON CONFLICT (message_id, event_type) DO NOTHING to prevent duplicate events.
- * Returns { inserted: true } if the row was inserted, { inserted: false } if it was a duplicate.
- *
- * Exported for unit testing without a live database.
- */
-export async function processBounceSnsEvent(
-  db: Kysely<Database>,
-  snsMessageId: string,
-  messageId: string,
-  contactId: number,
-  campaignId: number | null,
-  variantId: number | null,
-  bounceType: string,
-  metadata: Record<string, unknown>,
-): Promise<{ inserted: boolean }> {
-  const isHard = bounceType === 'Permanent';
-  const eventType = isHard ? EventType.HARD_BOUNCE : EventType.SOFT_BOUNCE;
-
-  const result = await db
-    .insertInto('events')
-    .values({
-      event_type: eventType,
-      contact_id: contactId,
-      campaign_id: campaignId,
-      variant_id: variantId,
-      message_id: messageId,
-      event_time: new Date(),
-      metadata: { sns_message_id: snsMessageId, ...metadata },
-    })
-    .onConflict((oc) => oc.columns(['message_id', 'event_type']).doNothing())
-    .executeTakeFirst();
-
-  return { inserted: (result?.numInsertedOrUpdatedRows ?? 0n) > 0n };
-}
-
-// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 export const webhooksInboundRoutes: FastifyPluginAsync = async (app) => {
-  // POST /api/webhooks/inbound/ses — SES SNS notification receiver
-  app.post('/inbound/ses', async (request, reply) => {
+  // POST /api/webhooks/inbound/sns — SES SNS notification receiver
+  app.post('/inbound/sns', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
     const db = getDb();
 
@@ -140,26 +125,44 @@ export const webhooksInboundRoutes: FastifyPluginAsync = async (app) => {
     const isValid = await verifySnsSignature(body);
     if (!isValid) {
       request.log.warn('SNS signature verification failed');
-      return reply.status(403).send({ error: { code: 'INVALID_SNS_SIGNATURE', message: 'Invalid SNS signature' } });
+      return reply.status(403).send({
+        error: {
+          code: 'INVALID_SNS_SIGNATURE',
+          message: 'Invalid SNS signature',
+        },
+      });
     }
 
     // Handle SNS subscription confirmation
     if (body['Type'] === 'SubscriptionConfirmation') {
       const subscribeUrl = body['SubscribeURL'] as string;
-      // Validate SubscribeURL domain before following it
       if (subscribeUrl) {
         try {
           const parsed = new URL(subscribeUrl);
-          if (parsed.protocol === 'https:' && /\.amazonaws\.com$/.test(parsed.hostname)) {
+          if (
+            parsed.protocol === 'https:' &&
+            /\.amazonaws\.com$/.test(parsed.hostname)
+          ) {
             await fetch(subscribeUrl);
           } else {
-            request.log.warn({ subscribeUrl }, 'Rejected SubscribeURL with non-AWS domain');
-            return reply
-              .status(400)
-              .send({ error: { code: 'INVALID_SUBSCRIBE_URL', message: 'Invalid SubscribeURL' } });
+            request.log.warn(
+              { subscribeUrl },
+              'Rejected SubscribeURL with non-AWS domain',
+            );
+            return reply.status(400).send({
+              error: {
+                code: 'INVALID_SUBSCRIBE_URL',
+                message: 'Invalid SubscribeURL',
+              },
+            });
           }
         } catch {
-          return reply.status(400).send({ error: { code: 'INVALID_SUBSCRIBE_URL', message: 'Invalid SubscribeURL' } });
+          return reply.status(400).send({
+            error: {
+              code: 'INVALID_SUBSCRIBE_URL',
+              message: 'Invalid SubscribeURL',
+            },
+          });
         }
       }
       return reply.status(200).send({ confirmed: true });
@@ -176,13 +179,19 @@ export const webhooksInboundRoutes: FastifyPluginAsync = async (app) => {
         messageBody = JSON.parse(body['Message']) as Record<string, unknown>;
       } catch {
         request.log.warn('Failed to parse SNS Message body as JSON');
-        return reply.status(400).send({ error: { code: 'INVALID_SNS_MESSAGE', message: 'Invalid SNS Message JSON' } });
+        return reply.status(400).send({
+          error: {
+            code: 'INVALID_SNS_MESSAGE',
+            message: 'Invalid SNS Message JSON',
+          },
+        });
       }
     } else {
       messageBody = body['Message'] as Record<string, unknown>;
     }
 
-    const notificationType = (messageBody?.notificationType ?? messageBody?.eventType) as string | undefined;
+    const notificationType = (messageBody?.notificationType ??
+      messageBody?.eventType) as string | undefined;
 
     if (!notificationType) {
       return reply.status(200).send();
@@ -190,14 +199,18 @@ export const webhooksInboundRoutes: FastifyPluginAsync = async (app) => {
 
     // Process async to return 200 fast
     processNotification(db, notificationType, messageBody).catch((err) => {
-      console.error('SES notification processing error:', err);
+      request.log.error({ err }, 'SES notification processing error');
     });
 
     return reply.status(200).send();
   });
 };
 
-async function processNotification(db: Kysely<Database>, type: string, data: Record<string, unknown>): Promise<void> {
+async function processNotification(
+  db: Kysely<Database>,
+  type: string,
+  data: Record<string, unknown>,
+): Promise<void> {
   const mail = data['mail'] as Record<string, unknown> | undefined;
   const sesMessageId = (mail?.['messageId'] as string) ?? null;
 
@@ -218,10 +231,12 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
       const bounceType = bounce?.['bounceType'] as string;
       const isHard = bounceType === 'Permanent';
       const eventType = isHard ? EventType.HARD_BOUNCE : EventType.SOFT_BOUNCE;
-      const bouncedRecipients = bounce?.['bouncedRecipients'] as Array<{ diagnosticCode?: string }> | undefined;
+      const bouncedRecipients = bounce?.['bouncedRecipients'] as
+        | Array<{ diagnosticCode?: string }>
+        | undefined;
 
-      // COMP-01: Idempotent insert — ON CONFLICT DO NOTHING prevents duplicate events
-      const bounceInsert: InsertResult = await db
+      // Idempotent insert via ON CONFLICT DO NOTHING
+      const bounceInsert = await db
         .insertInto('events')
         .values({
           event_type: eventType,
@@ -236,16 +251,22 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
             sub_type: bounce?.['bounceSubType'],
           },
         })
-        .onConflict((oc) => oc.columns(['message_id', 'event_type']).doNothing())
+        .onConflict((oc) =>
+          oc.columns(['message_id', 'event_type']).doNothing(),
+        )
         .executeTakeFirst();
 
       // Skip side effects if this was a duplicate (0 rows inserted)
-      if (bounceInsert.numInsertedOrUpdatedRows === 0n) {
+      if ((bounceInsert?.numInsertedOrUpdatedRows ?? 0n) === 0n) {
         break;
       }
 
       const bounceOps: Promise<unknown>[] = [
-        db.updateTable('messages').set({ status: MessageStatus.BOUNCED }).where('id', '=', message.id).execute(),
+        db
+          .updateTable('messages')
+          .set({ status: MessageStatus.BOUNCED })
+          .where('id', '=', message.id)
+          .execute(),
         db
           .updateTable('campaigns')
           .set((eb) => ({ total_bounces: eb('total_bounces', '+', 1) }))
@@ -270,8 +291,8 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
     case 'Complaint': {
       const complaint = data['complaint'] as Record<string, unknown>;
 
-      // COMP-01: Idempotent insert — ON CONFLICT DO NOTHING prevents duplicate events
-      const complaintInsert: InsertResult = await db
+      // Idempotent insert via ON CONFLICT DO NOTHING
+      const complaintInsert = await db
         .insertInto('events')
         .values({
           event_type: EventType.COMPLAINT,
@@ -285,16 +306,22 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
             complaint_timestamp: complaint?.['timestamp'],
           },
         })
-        .onConflict((oc) => oc.columns(['message_id', 'event_type']).doNothing())
+        .onConflict((oc) =>
+          oc.columns(['message_id', 'event_type']).doNothing(),
+        )
         .executeTakeFirst();
 
       // Skip side effects if this was a duplicate (0 rows inserted)
-      if (complaintInsert.numInsertedOrUpdatedRows === 0n) {
+      if ((complaintInsert?.numInsertedOrUpdatedRows ?? 0n) === 0n) {
         break;
       }
 
       await Promise.all([
-        db.updateTable('messages').set({ status: MessageStatus.COMPLAINED }).where('id', '=', message.id).execute(),
+        db
+          .updateTable('messages')
+          .set({ status: MessageStatus.COMPLAINED })
+          .where('id', '=', message.id)
+          .execute(),
         db
           .updateTable('contacts')
           .set({ status: ContactStatus.COMPLAINED })
@@ -302,7 +329,9 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
           .execute(),
         db
           .updateTable('campaigns')
-          .set((eb) => ({ total_complaints: eb('total_complaints', '+', 1) }))
+          .set((eb) => ({
+            total_complaints: eb('total_complaints', '+', 1),
+          }))
           .where('id', '=', message.campaign_id)
           .execute(),
       ]);
@@ -329,7 +358,9 @@ async function processNotification(db: Kysely<Database>, type: string, data: Rec
           .execute(),
         db
           .updateTable('campaigns')
-          .set((eb) => ({ total_delivered: eb('total_delivered', '+', 1) }))
+          .set((eb) => ({
+            total_delivered: eb('total_delivered', '+', 1),
+          }))
           .where('id', '=', message.campaign_id)
           .execute(),
       ]);

@@ -1,12 +1,13 @@
 import pino from 'pino';
 
-const REDACT_PATHS = ['*.email', '*.authorization'];
-
 const isProduction = process.env['NODE_ENV'] === 'production';
 
 export const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
-  redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+  redact: {
+    paths: ['*.email', '*.authorization', '*.secret', '*.password'],
+    censor: '[REDACTED]',
+  },
   ...(isProduction
     ? {}
     : {

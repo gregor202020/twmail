@@ -3,17 +3,11 @@
  * Seed script to create the initial admin user.
  *
  * Usage:
- *   npx tsx packages/api/src/seed-admin.ts --email admin@example.com --password 'securepass'
+ *   npx tsx packages/api/src/seed-admin.ts --email admin@thirdwavebbq.com.au --password changeme123
  *   # or from packages/api:
- *   npm run seed:admin -- --email admin@example.com --password 'securepass'
+ *   npm run seed:admin -- --email admin@thirdwavebbq.com.au --password changeme123
  *
  * Environment: DATABASE_URL must be set.
- *
- * Required flags:
- *   --email    Admin email address
- *   --password Admin password
- * Optional:
- *   --name     Display name (default: "Admin")
  */
 import { getDb, destroyDb } from '@twmail/shared';
 import bcrypt from 'bcrypt';
@@ -29,20 +23,18 @@ async function main() {
     return fallback;
   }
 
-  const email = getArg('--email');
+  const email = getArg('--email', 'admin@thirdwavebbq.com.au')!;
   const name: string = getArg('--name', 'Admin')!;
-  const password = getArg('--password');
-
-  if (!email || !password) {
-    console.error('Error: --email and --password flags are required.');
-    console.error('Usage: npx tsx seed-admin.ts --email <email> --password <password> [--name <name>]');
-    process.exit(1);
-  }
+  const password = getArg('--password', 'changeme123')!;
 
   const db = getDb();
 
   // Check if user already exists
-  const existing = await db.selectFrom('users').select('id').where('email', '=', email).executeTakeFirst();
+  const existing = await db
+    .selectFrom('users')
+    .select('id')
+    .where('email', '=', email)
+    .executeTakeFirst();
 
   if (existing) {
     console.log(`User "${email}" already exists (id=${existing.id}). Skipping.`);

@@ -36,25 +36,28 @@ export function buildRuleFilter(
 ): (eb: ExpressionBuilder<Database, 'contacts'>) => Expression<SqlBool> {
   return (eb: ExpressionBuilder<Database, 'contacts'>) => {
     const conditions = group.rules.map((rule) => {
-      if ('logic' in rule) {
-        // Nested group — TypeScript narrows to SegmentRuleGroup via 'logic' in rule
-        return buildRuleFilter(rule)(eb);
+      if ('conjunction' in rule) {
+        // Nested group — recurse
+        return buildRuleFilter(rule as SegmentRuleGroup)(eb);
       }
-      return buildSingleRule(eb, rule);
+      return buildSingleRule(eb, rule as SegmentRule);
     });
 
     if (conditions.length === 0) {
       return eb.val(true);
     }
 
-    if (group.logic === 'or') {
+    if (group.conjunction === 'or') {
       return eb.or(conditions);
     }
     return eb.and(conditions);
   };
 }
 
-export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rule: SegmentRule): Expression<SqlBool> {
+export function buildSingleRule(
+  eb: ExpressionBuilder<Database, 'contacts'>,
+  rule: SegmentRule,
+): Expression<SqlBool> {
   const { field, operator, value } = rule;
 
   // Handle custom_fields with jsonb path
@@ -71,7 +74,6 @@ export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rul
   // Use sql template for all comparisons to avoid Kysely's heterogeneous column
   // type-inference limitation (col is keyof Database['contacts'] — a union of all
   // column names — so Kysely cannot narrow the expected value type at compile time).
-  // sql<SqlBool>`` returns Expression<SqlBool>, the correct return type.
   const colRef = sql.ref(field);
 
   switch (operator) {
@@ -116,7 +118,6 @@ export function buildSingleRule(eb: ExpressionBuilder<Database, 'contacts'>, rul
       return sql<SqlBool>`${colRef} >= ${sql.val(low)} AND ${colRef} <= ${sql.val(high)}`;
     }
     case 'within_days': {
-      // "within last N days" means column >= (now - N * 86400000ms)
       const days = Number(value);
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
       return sql<SqlBool>`${colRef} >= ${sql.val(cutoff)}`;
@@ -134,15 +135,39 @@ function buildJsonbRule(
 ): Expression<SqlBool> {
   switch (operator) {
     case 'eq':
-      return sql`custom_fields->>${sql.lit(path)} = ${sql.lit(String(value))}`;
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} = ${sql.val(String(value))}`;
     case 'neq':
-      return sql`custom_fields->>${sql.lit(path)} != ${sql.lit(String(value))}`;
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} != ${sql.val(String(value))}`;
+    case 'gt':
+      return sql<SqlBool>`(custom_fields->>${sql.lit(path)})::numeric > ${sql.val(Number(value))}`;
+    case 'gte':
+      return sql<SqlBool>`(custom_fields->>${sql.lit(path)})::numeric >= ${sql.val(Number(value))}`;
+    case 'lt':
+      return sql<SqlBool>`(custom_fields->>${sql.lit(path)})::numeric < ${sql.val(Number(value))}`;
+    case 'lte':
+      return sql<SqlBool>`(custom_fields->>${sql.lit(path)})::numeric <= ${sql.val(Number(value))}`;
     case 'contains':
-      return sql`custom_fields->>${sql.lit(path)} ILIKE ${'%' + String(value) + '%'}`;
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} ILIKE ${sql.val('%' + String(value) + '%')}`;
+    case 'not_contains':
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} NOT ILIKE ${sql.val('%' + String(value) + '%')}`;
+    case 'starts_with':
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} ILIKE ${sql.val(String(value) + '%')}`;
+    case 'ends_with':
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} ILIKE ${sql.val('%' + String(value))}`;
     case 'is_set':
-      return sql`custom_fields ? ${sql.lit(path)}`;
+      return sql<SqlBool>`custom_fields ? ${sql.lit(path)}`;
     case 'is_not_set':
-      return sql`NOT (custom_fields ? ${sql.lit(path)})`;
+      return sql<SqlBool>`NOT (custom_fields ? ${sql.lit(path)})`;
+    case 'in': {
+      const inValues = value as string[];
+      const placeholders = inValues.map((v) => sql.val(v));
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} IN (${sql.join(placeholders)})`;
+    }
+    case 'not_in': {
+      const notInValues = value as string[];
+      const placeholders = notInValues.map((v) => sql.val(v));
+      return sql<SqlBool>`custom_fields->>${sql.lit(path)} NOT IN (${sql.join(placeholders)})`;
+    }
     default:
       throw new Error(`Unsupported operator for custom field: ${operator}`);
   }
@@ -159,7 +184,11 @@ function buildJsonbRule(
 export async function resolveSegmentContactIds(segmentId: number): Promise<number[]> {
   const db = getDb();
 
-  const segment = await db.selectFrom('segments').selectAll().where('id', '=', segmentId).executeTakeFirst();
+  const segment = await db
+    .selectFrom('segments')
+    .selectAll()
+    .where('id', '=', segmentId)
+    .executeTakeFirst();
 
   if (!segment) {
     throw new Error(`Segment not found: ${segmentId}`);

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { getDb } from '@twmail/shared';
 import { requireAdmin } from '../middleware/auth.js';
-import { getSettings, updateSettings } from '../services/settings.service.js';
 
 const updateSchema = z.object({
   organization_name: z.string().max(255).optional(),
@@ -15,15 +15,36 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', requireAdmin());
 
   // GET /api/settings
-  app.get('/', async () => {
-    const settings = await getSettings();
-    return { data: settings };
+  app.get('/', async (_request, reply) => {
+    const db = getDb();
+
+    let row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirst();
+
+    if (!row) {
+      // Ensure the singleton row exists
+      await db
+        .insertInto('settings')
+        .values({ id: 1 } as never)
+        .onConflict((oc) => oc.column('id').doNothing())
+        .execute();
+      row = await db.selectFrom('settings').selectAll().where('id', '=', 1).executeTakeFirstOrThrow();
+    }
+
+    return reply.send({ data: row });
   });
 
   // PATCH /api/settings
-  app.patch('/', async (request) => {
+  app.patch('/', async (request, reply) => {
     const body = updateSchema.parse(request.body);
-    const settings = await updateSettings(body);
-    return { data: settings };
+    const db = getDb();
+
+    const updated = await db
+      .updateTable('settings')
+      .set({ ...body, updated_at: new Date() })
+      .where('id', '=', 1)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    return reply.send({ data: updated });
   });
 };

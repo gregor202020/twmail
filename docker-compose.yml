@@ -88,6 +88,8 @@ services:
       - SENTRY_DSN=${SENTRY_DSN:-}
     ports:
       - "3000:3000"
+    volumes:
+      - assets:/data/assets
     depends_on:
       postgres:
         condition: service_healthy
@@ -178,14 +180,6 @@ services:
     depends_on:
       - api
       - frontend
-    networks:
-      - twmail
-
-  bull-board:
-    image: node:22-alpine
-    container_name: twmail-bull-board
-    working_dir: /app
-    command: echo "Bull Board placeholder - will be configured in Plan 2"
     networks:
       - twmail
 

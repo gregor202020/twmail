@@ -71,7 +71,7 @@ export async function getImport(id: number): Promise<Import> {
   return imp;
 }
 
-export async function getImportErrors(id: number): Promise<Record<string, unknown> | null> {
+export async function getImportErrors(id: number): Promise<Record<string, unknown>[]> {
   const imp = await getImport(id);
   return imp.errors;
 }

@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { formatDate, timeAgo } from '@/lib/utils';
-import { UserRole } from '@twmail/shared/types';
+import { UserRole } from '@/types';
 import { TopBar } from '@/components/layout/top-bar';
 import { DataTable, type Column } from '@/components/shared/data-table';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';

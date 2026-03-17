@@ -31,7 +31,12 @@ async function parseResponse<T>(res: Response, fallbackMsg: string): Promise<T> 
   }
   if (!res.ok) {
     const error = (json.error || {}) as Record<string, unknown>;
-    throw new ApiError(res.status, (error.code as string) || 'UNKNOWN', (error.message as string) || fallbackMsg, error.details as Array<{ field: string; message: string }>);
+    throw new ApiError(
+      res.status,
+      (error.code as string) || 'UNKNOWN',
+      (error.message as string) || fallbackMsg,
+      error.details as Array<{ field: string; message: string }>,
+    );
   }
   return json as T;
 }
@@ -67,7 +72,9 @@ export const api = {
   delete: <T>(endpoint: string) => apiClient<T>(endpoint, { method: 'DELETE' }),
   upload: async <T>(endpoint: string, formData: FormData): Promise<T> => {
     const res = await fetch(`/api/proxy${endpoint}`, {
-      method: 'POST', body: formData, credentials: 'include',
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
     });
     return parseResponse<T>(res, 'Upload failed');
   },

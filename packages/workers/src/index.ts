@@ -11,7 +11,8 @@ async function main() {
   let schedulerCleanup: (() => Promise<void>) | null = null;
 
   if (workerType === 'bulk') {
-    const { createBulkSendWorker, createCampaignSendWorker } = await import('./workers/bulk-send.worker.js');
+    const { createBulkSendWorker } = await import('./workers/bulk-send.worker.js');
+    const { createCampaignSendWorker } = await import('./workers/campaign-send.worker.js');
     const { createAbEvalWorker } = await import('./workers/ab-eval.worker.js');
     const { createResendWorker } = await import('./workers/resend.worker.js');
 
@@ -20,7 +21,7 @@ async function main() {
     workers.push(createAbEvalWorker());
     workers.push(createResendWorker());
 
-    // BUG-05: Start scheduled campaign polling
+    // Start scheduled campaign polling
     const { startScheduler } = await import('./scheduler.js');
     const scheduler = await startScheduler();
     schedulerCleanup = async () => {
@@ -37,16 +38,25 @@ async function main() {
     workers.push(createWebhookWorker());
 
     logger.info('Started: import, webhook workers');
+  } else {
+    logger.error({ workerType }, `Unknown WORKER_TYPE: ${workerType}`);
+    process.exit(1);
   }
 
-  logger.info({ workerType }, `TWMail Worker (${workerType}) ready — waiting for jobs...`);
+  logger.info({ workerType }, `TWMail Worker (${workerType}) ready -- waiting for jobs...`);
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, `Received ${signal}, shutting down workers...`);
-    if (schedulerCleanup) await schedulerCleanup();
+
+    if (schedulerCleanup) {
+      await schedulerCleanup();
+    }
+
     await Promise.all(workers.map((w) => w.close()));
     await destroyDb();
     await destroyRedis();
+
+    logger.info('Shutdown complete');
     process.exit(0);
   };
 

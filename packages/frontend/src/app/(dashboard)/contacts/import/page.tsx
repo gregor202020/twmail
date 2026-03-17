@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ImportMapper } from '@/components/contacts/import-mapper';
-import { ImportStatus } from '@twmail/shared/types';
+import { ImportStatus } from '@/types';
 import type { Import } from '@/types';
 
 type ImportStage = 'input' | 'mapping' | 'processing' | 'done';

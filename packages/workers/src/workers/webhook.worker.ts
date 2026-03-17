@@ -13,12 +13,37 @@ export interface WebhookJobData {
   attempt: number;
 }
 
-// Exponential backoff delays: 30s, 2m, 8m, 32m, 2h
-const BACKOFF_DELAYS_MS = [30 * 1000, 2 * 60 * 1000, 8 * 60 * 1000, 32 * 60 * 1000, 2 * 60 * 60 * 1000];
+/**
+ * Exponential backoff delays for retry attempts:
+ *   Attempt 1: 1 minute
+ *   Attempt 2: 5 minutes
+ *   Attempt 3: 30 minutes
+ */
+const BACKOFF_DELAYS_MS = [
+  1 * 60 * 1000,    // 1 minute
+  5 * 60 * 1000,    // 5 minutes
+  30 * 60 * 1000,   // 30 minutes
+];
 
+const MAX_ATTEMPTS = 3;
+
+/**
+ * Webhook delivery worker: POSTs event payloads to subscribed webhook endpoints.
+ *
+ * Processing:
+ *   1. Dedup: skip if delivery already completed or permanently failed
+ *   2. Sign payload with HMAC-SHA256 using endpoint secret
+ *   3. POST to endpoint URL with headers (Content-Type, X-Webhook-Signature, X-Webhook-Event)
+ *   4. On success (2xx): mark DELIVERED, reset endpoint failure count
+ *   5. On failure: increment endpoint failure count, retry with exponential backoff
+ *   6. After max attempts: mark delivery as FAILED
+ *   7. After 50 consecutive endpoint failures: disable the endpoint
+ */
 export function createWebhookWorker(): Worker {
   const redis = getRedis();
-  const webhookQueue = new Queue('webhook', { connection: redis as unknown as ConnectionOptions });
+  const webhookQueue = new Queue('webhook', {
+    connection: redis as unknown as ConnectionOptions,
+  });
 
   const worker = new Worker<WebhookJobData>(
     'webhook',
@@ -35,11 +60,13 @@ export function createWebhookWorker(): Worker {
 
       if (
         existing &&
-        (existing.status === WebhookDeliveryStatus.DELIVERED || existing.status === WebhookDeliveryStatus.FAILED)
+        (existing.status === WebhookDeliveryStatus.DELIVERED ||
+          existing.status === WebhookDeliveryStatus.FAILED)
       ) {
         return { skipped: true, reason: 'already_processed' };
       }
 
+      // Sign payload with HMAC-SHA256
       const body = JSON.stringify(payload);
       const signature = createHmac('sha256', secret).update(body).digest('hex');
 
@@ -59,7 +86,7 @@ export function createWebhookWorker(): Worker {
         const responseBody = await response.text().catch(() => '');
 
         if (response.ok) {
-          // Success
+          // Success: update delivery status to DELIVERED
           await db
             .updateTable('webhook_deliveries')
             .set({
@@ -81,7 +108,7 @@ export function createWebhookWorker(): Worker {
           return { delivered: true };
         }
 
-        // Non-2xx response — will retry via backoff
+        // Non-2xx response: record response details before retrying
         await db
           .updateTable('webhook_deliveries')
           .set({
@@ -95,7 +122,11 @@ export function createWebhookWorker(): Worker {
         throw new Error(`Webhook returned ${response.status}`);
       } catch (err: unknown) {
         // Update delivery attempt count
-        await db.updateTable('webhook_deliveries').set({ attempts: attempt }).where('id', '=', deliveryId).execute();
+        await db
+          .updateTable('webhook_deliveries')
+          .set({ attempts: attempt })
+          .where('id', '=', deliveryId)
+          .execute();
 
         // Increment endpoint failure count
         await db
@@ -112,16 +143,27 @@ export function createWebhookWorker(): Worker {
           .executeTakeFirst();
 
         if (endpoint && endpoint.failure_count >= 50) {
-          await db.updateTable('webhook_endpoints').set({ active: false }).where('id', '=', endpointId).execute();
+          await db
+            .updateTable('webhook_endpoints')
+            .set({ active: false })
+            .where('id', '=', endpointId)
+            .execute();
+          logger.warn({ endpointId }, 'Webhook endpoint disabled after 50 consecutive failures');
         }
 
-        // Mark as failed after max retries (5 attempts)
-        if (attempt >= 5) {
+        // Mark as permanently failed after max retries
+        if (attempt >= MAX_ATTEMPTS) {
           await db
             .updateTable('webhook_deliveries')
             .set({ status: WebhookDeliveryStatus.FAILED })
             .where('id', '=', deliveryId)
             .execute();
+
+          logger.error(
+            { deliveryId, endpointId, attempt },
+            'Webhook delivery permanently failed after max retries',
+          );
+
           return { failed: true, error: err instanceof Error ? err.message : String(err) };
         }
 
@@ -137,8 +179,21 @@ export function createWebhookWorker(): Worker {
 
         await webhookQueue.add(
           'deliver',
-          { deliveryId, endpointId, url, secret, eventType, payload, attempt: attempt + 1 },
+          {
+            deliveryId,
+            endpointId,
+            url,
+            secret,
+            eventType,
+            payload,
+            attempt: attempt + 1,
+          },
           { delay: delayMs },
+        );
+
+        logger.info(
+          { deliveryId, endpointId, attempt, nextDelayMs: delayMs },
+          'Webhook delivery scheduled for retry',
         );
 
         return { retrying: true, attempt, nextDelayMs: delayMs };
@@ -151,7 +206,14 @@ export function createWebhookWorker(): Worker {
   );
 
   worker.on('failed', (job, err) => {
-    logger.error({ jobId: job?.id, err }, 'Webhook delivery job failed');
+    logger.error(
+      { jobId: job?.id, deliveryId: job?.data?.deliveryId, err },
+      'Webhook delivery job failed',
+    );
+  });
+
+  worker.on('error', (err) => {
+    logger.error({ err }, 'Webhook worker error');
   });
 
   return worker;

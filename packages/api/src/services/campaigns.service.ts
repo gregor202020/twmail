@@ -45,13 +45,13 @@ export async function getCampaign(id: number): Promise<Campaign> {
 
 export async function createCampaign(data: {
   name: string;
-  subject?: string | null;
-  preview_text?: string | null;
+  subject?: string;
+  preview_text?: string;
   from_name?: string;
   from_email?: string;
-  reply_to?: string | null;
+  reply_to?: string;
   template_id?: number | null;
-  content_html?: string | null;
+  content_html?: string;
   content_json?: Record<string, unknown> | null;
   segment_id?: number | null;
   list_id?: number | null;
@@ -66,13 +66,13 @@ export async function createCampaign(data: {
     .insertInto('campaigns')
     .values({
       name: data.name,
-      subject: data.subject ?? null,
-      preview_text: data.preview_text ?? null,
+      subject: data.subject,
+      preview_text: data.preview_text,
       from_name: data.from_name,
       from_email: data.from_email,
-      reply_to: data.reply_to ?? null,
+      reply_to: data.reply_to,
       template_id: data.template_id ?? null,
-      content_html: data.content_html ?? null,
+      content_html: data.content_html,
       content_json: data.content_json ?? null,
       segment_id: data.segment_id ?? null,
       list_id: data.list_id ?? null,
@@ -89,13 +89,13 @@ export async function updateCampaign(
   id: number,
   data: {
     name?: string;
-    subject?: string | null;
-    preview_text?: string | null;
+    subject?: string;
+    preview_text?: string;
     from_name?: string;
     from_email?: string;
-    reply_to?: string | null;
+    reply_to?: string;
     template_id?: number | null;
-    content_html?: string | null;
+    content_html?: string;
     content_json?: Record<string, unknown> | null;
     segment_id?: number | null;
     list_id?: number | null;
@@ -363,8 +363,7 @@ export async function configureAbTest(
   variants: Array<{
     variant_name: string;
     subject: string;
-    preview_text?: string | null;
-    content_html?: string | null;
+    content_html?: string;
     content_json?: Record<string, unknown> | null;
     percentage: number;
   }>,
@@ -393,8 +392,7 @@ export async function configureAbTest(
         campaign_id: campaignId,
         variant_name: variant.variant_name,
         subject: variant.subject,
-        preview_text: variant.preview_text ?? null,
-        content_html: variant.content_html ?? null,
+        content_html: variant.content_html,
         content_json: variant.content_json ?? null,
         percentage: variant.percentage,
       })

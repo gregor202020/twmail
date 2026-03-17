@@ -19,7 +19,7 @@ export interface SendEmailParams {
   replyTo?: string;
   configurationSet?: string;
   headers?: Record<string, string>;
-  messageId: string; // our internal message ID for tracking
+  messageId: string;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<string | undefined> {

@@ -1,6 +1,6 @@
 {
-  "name": "twmail",
-  "version": "0.1.0",
+  "name": "third-wave-mail",
+  "version": "2.0.0",
   "private": true,
   "workspaces": [
     "packages/shared",
@@ -11,28 +11,22 @@
   "scripts": {
     "dev:api": "npm run dev --workspace=packages/api",
     "dev:workers": "npm run dev --workspace=packages/workers",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
     "build": "npm run build --workspaces",
     "test": "npm test --workspace=packages/api",
     "lint": "eslint packages/api/src packages/workers/src packages/shared/src",
     "format": "prettier --write \"packages/{api,workers,shared}/src/**/*.ts\"",
     "format:check": "prettier --check \"packages/{api,workers,shared}/src/**/*.ts\"",
-    "db:migrate": "psql $DATABASE_URL -f db/migrations/001_initial_schema.sql",
-    "prepare": "husky"
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "engines": {
     "node": ">=22.0.0"
   },
-  "lint-staged": {
-    "packages/{api,workers,shared}/src/**/*.ts": [
-      "eslint --max-warnings=0",
-      "prettier --write"
-    ]
-  },
   "devDependencies": {
+    "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.1.8",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.3.3",
     "prettier": "^3.8.1",
+    "typescript": "^5.7.0",
     "typescript-eslint": "^8.57.0"
   }
 }

@@ -3,7 +3,7 @@ import { getConfig } from './config.js';
 import { destroyDb, destroyRedis } from '@twmail/shared';
 
 async function main() {
-  const config = getConfig();
+  const cfg = getConfig();
   const app = await buildApp();
 
   const shutdown = async (signal: string) => {
@@ -18,8 +18,8 @@ async function main() {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 
   try {
-    await app.listen({ port: config.API_PORT, host: config.API_HOST });
-    app.log.info(`TWMail API running on ${config.API_HOST}:${config.API_PORT}`);
+    await app.listen({ port: cfg.API_PORT, host: cfg.API_HOST });
+    app.log.info(`TWMail API running on ${cfg.API_HOST}:${cfg.API_PORT}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

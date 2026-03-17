@@ -44,10 +44,10 @@ export async function getTemplate(id: number): Promise<Template> {
 
 export async function createTemplate(data: {
   name: string;
-  category?: string | null;
-  content_html?: string | null;
+  category?: string;
+  content_html?: string;
   content_json?: Record<string, unknown>;
-  thumbnail_url?: string | null;
+  thumbnail_url?: string;
   is_default?: boolean;
 }): Promise<Template> {
   const db = getDb();
@@ -56,10 +56,10 @@ export async function createTemplate(data: {
     .insertInto('templates')
     .values({
       name: data.name,
-      category: data.category ?? null,
-      content_html: data.content_html ?? null,
+      category: data.category,
+      content_html: data.content_html,
       content_json: data.content_json ?? {},
-      thumbnail_url: data.thumbnail_url ?? null,
+      thumbnail_url: data.thumbnail_url,
       is_default: data.is_default ?? false,
     })
     .returningAll()
@@ -70,10 +70,10 @@ export async function updateTemplate(
   id: number,
   data: {
     name?: string;
-    category?: string | null;
-    content_html?: string | null;
+    category?: string;
+    content_html?: string;
     content_json?: Record<string, unknown>;
-    thumbnail_url?: string | null;
+    thumbnail_url?: string;
     is_default?: boolean;
   },
 ): Promise<Template> {

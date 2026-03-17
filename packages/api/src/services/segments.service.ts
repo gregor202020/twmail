@@ -41,8 +41,8 @@ export async function createSegment(data: {
     .values({
       name: data.name,
       type: data.type ?? SegmentType.DYNAMIC,
-      rules: data.rules ?? null,
-      description: data.description ?? null,
+      rules: data.rules ?? { groups: [] },
+      description: data.description ?? '',
     })
     .returningAll()
     .executeTakeFirstOrThrow();
@@ -115,7 +115,7 @@ export async function getSegmentContacts(
 
   // Update cache
   db.updateTable('segments')
-    .set({ cached_count: total, cached_at: new Date() })
+    .set({ cached_count: total })
     .where('id', '=', segmentId)
     .execute()
     .catch((err: unknown) => {
@@ -190,7 +190,7 @@ export async function getSegmentCount(segmentId: number): Promise<{ count: numbe
 
   // Update cache
   db.updateTable('segments')
-    .set({ cached_count: count, cached_at: new Date() })
+    .set({ cached_count: count })
     .where('id', '=', segmentId)
     .execute()
     .catch((err: unknown) => {
@@ -311,8 +311,8 @@ function buildRuleFilter(
 ): (eb: ExpressionBuilder<Database, 'contacts'>) => Expression<SqlBool> {
   return (eb: ExpressionBuilder<Database, 'contacts'>) => {
     const conditions = group.rules.map((rule) => {
-      if ('logic' in rule) {
-        // Nested group — TypeScript narrows to SegmentRuleGroup via 'logic' in rule
+      if ('conjunction' in rule) {
+        // Nested group — TypeScript narrows to SegmentRuleGroup via 'conjunction' in rule
         return buildRuleFilter(rule)(eb);
       }
       return buildSingleRule(eb, rule);
@@ -322,7 +322,7 @@ function buildRuleFilter(
       return eb.val(true);
     }
 
-    if (group.logic === 'or') {
+    if (group.conjunction === 'or') {
       return eb.or(conditions);
     }
     return eb.and(conditions);

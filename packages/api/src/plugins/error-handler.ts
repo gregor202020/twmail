@@ -15,7 +15,6 @@ export class AppError extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 const plugin: FastifyPluginAsync = async (app) => {
   app.setErrorHandler((error, _request, reply) => {
     // Zod validation errors

@@ -2,7 +2,6 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { AppError } from '../plugins/error-handler.js';
 import { ErrorCode, UserRole } from '@twmail/shared';
 
-// reply is intentionally unused — Fastify preHandler hooks require this signature
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   void reply;
   await request.server.authenticate(request);

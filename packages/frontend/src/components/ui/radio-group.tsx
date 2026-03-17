@@ -1,38 +1,70 @@
-"use client"
+"use client";
 
-import { Radio as RadioPrimitive } from "@base-ui/react/radio"
-import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
-function RadioGroup({ className, ...props }: RadioGroupPrimitive.Props) {
-  return (
-    <RadioGroupPrimitive
-      data-slot="radio-group"
-      className={cn("grid w-full gap-2", className)}
-      {...props}
-    />
-  )
+interface RadioGroupContextValue {
+  value: string;
+  onValueChange: (value: string) => void;
 }
 
-function RadioGroupItem({ className, ...props }: RadioPrimitive.Root.Props) {
+const RadioGroupContext = React.createContext<RadioGroupContextValue>({
+  value: "",
+  onValueChange: () => {},
+});
+
+interface RadioGroupProps extends React.HTMLAttributes<HTMLDivElement> {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+}
+
+function RadioGroup({ value: controlledValue, defaultValue = "", onValueChange, className, children, ...props }: RadioGroupProps) {
+  const [internalValue, setInternalValue] = React.useState(defaultValue);
+  const value = controlledValue ?? internalValue;
+
+  const handleChange = React.useCallback((v: string) => {
+    setInternalValue(v);
+    onValueChange?.(v);
+  }, [onValueChange]);
+
   return (
-    <RadioPrimitive.Root
-      data-slot="radio-group-item"
+    <RadioGroupContext.Provider value={{ value, onValueChange: handleChange }}>
+      <div role="radiogroup" className={cn("grid w-full gap-2", className)} {...props}>
+        {children}
+      </div>
+    </RadioGroupContext.Provider>
+  );
+}
+
+interface RadioGroupItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  value: string;
+}
+
+function RadioGroupItem({ value, className, ...props }: RadioGroupItemProps) {
+  const ctx = React.useContext(RadioGroupContext);
+  const isChecked = ctx.value === value;
+
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={isChecked}
+      onClick={() => ctx.onValueChange(value)}
       className={cn(
-        "group/radio-group-item peer relative flex aspect-square size-4 shrink-0 rounded-full border border-input outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary",
-        className
+        "flex aspect-square size-4 shrink-0 rounded-full border border-input outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        isChecked && "border-primary bg-primary",
+        className,
       )}
       {...props}
     >
-      <RadioPrimitive.Indicator
-        data-slot="radio-group-indicator"
-        className="flex size-4 items-center justify-center"
-      >
-        <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-foreground" />
-      </RadioPrimitive.Indicator>
-    </RadioPrimitive.Root>
-  )
+      {isChecked && (
+        <span className="flex size-full items-center justify-center">
+          <span className="size-2 rounded-full bg-primary-foreground" />
+        </span>
+      )}
+    </button>
+  );
 }
 
-export { RadioGroup, RadioGroupItem }
+export { RadioGroup, RadioGroupItem };

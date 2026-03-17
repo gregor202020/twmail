@@ -24,7 +24,51 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await
+export function detectMachineOpen(ip: string, userAgent: string): boolean {
+  for (const prefix of APPLE_PROXY_PREFIXES) {
+    if (ip.startsWith(prefix)) return true;
+  }
+  for (const pattern of MACHINE_UA_PATTERNS) {
+    if (pattern.test(userAgent)) return true;
+  }
+  return false;
+}
+
+const CLICK_FALLBACK_URL = 'https://thirdwavebbq.com.au';
+
+/**
+ * Resolves a redirect URL from a SENT event's metadata link_map.
+ */
+export function resolveClickUrl(sentMetadata: unknown, linkHash: string): string {
+  let targetUrl = CLICK_FALLBACK_URL;
+
+  if (
+    sentMetadata != null &&
+    typeof sentMetadata === 'object' &&
+    'link_map' in sentMetadata
+  ) {
+    const map = (sentMetadata as Record<string, unknown>)['link_map'];
+    if (map != null && typeof map === 'object' && linkHash in map) {
+      const candidate = (map as Record<string, unknown>)[linkHash];
+      if (typeof candidate === 'string') {
+        targetUrl = candidate;
+      }
+    }
+  }
+
+  // Validate protocol to prevent open redirect
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return CLICK_FALLBACK_URL;
+    }
+  } catch {
+    return CLICK_FALLBACK_URL;
+  }
+
+  return targetUrl;
+}
+
 export const trackingRoutes: FastifyPluginAsync = async (app) => {
   // GET /t/o/:messageId.png — Open tracking pixel
   app.get<{ Params: { messageId: string } }>(
@@ -55,7 +99,7 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
       const { messageId, linkHash } = request.params;
       const db = getDb();
 
-      // DATA-09: Query SENT event link_map (idx_events_message covers message_id + event_type)
+      // Query SENT event link_map
       const sentEvent = await db
         .selectFrom('events')
         .select('metadata')
@@ -63,10 +107,9 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
         .where('event_type', '=', EventType.SENT)
         .executeTakeFirst();
 
-      // DATA-08: resolveClickUrl returns the verbatim original URL from link_map
       const targetUrl = resolveClickUrl(sentEvent?.metadata, linkHash);
 
-      // Record click event async (write-only audit trail — not used for URL resolution)
+      // Record click event async (fire and forget)
       recordClick(db, messageId, linkHash, targetUrl, request).catch((err) => {
         request.log.error({ err, messageId, linkHash }, 'recordClick failed');
       });
@@ -96,7 +139,10 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
       // Update contact status
       await db
         .updateTable('contacts')
-        .set({ status: ContactStatus.UNSUBSCRIBED, unsubscribed_at: new Date() })
+        .set({
+          status: ContactStatus.UNSUBSCRIBED,
+          unsubscribed_at: new Date(),
+        })
         .where('id', '=', message.contact_id)
         .execute();
 
@@ -147,7 +193,11 @@ export const trackingRoutes: FastifyPluginAsync = async (app) => {
   );
 };
 
-async function recordOpen(db: Kysely<Database>, messageId: string, request: FastifyRequest): Promise<void> {
+async function recordOpen(
+  db: Kysely<Database>,
+  messageId: string,
+  request: FastifyRequest,
+): Promise<void> {
   const message = await db
     .selectFrom('messages')
     .select(['contact_id', 'campaign_id', 'variant_id'])
@@ -175,8 +225,8 @@ async function recordOpen(db: Kysely<Database>, messageId: string, request: Fast
     })
     .execute();
 
-  // Update message first_open_at if not already set
   if (!isMachine) {
+    // Update message first_open_at if not already set
     await db
       .updateTable('messages')
       .set({ first_open_at: new Date(), status: MessageStatus.OPENED })
@@ -194,7 +244,7 @@ async function recordOpen(db: Kysely<Database>, messageId: string, request: Fast
       .where('id', '=', message.campaign_id)
       .execute();
 
-    // Update variant counters for A/B test (human open)
+    // Update variant counters for A/B test
     if (message.variant_id) {
       await db
         .updateTable('campaign_variants')
@@ -230,7 +280,11 @@ async function recordOpen(db: Kysely<Database>, messageId: string, request: Fast
         .execute();
     }
 
-    await db.updateTable('messages').set({ is_machine_open: true }).where('id', '=', messageId).execute();
+    await db
+      .updateTable('messages')
+      .set({ is_machine_open: true })
+      .where('id', '=', messageId)
+      .execute();
   }
 }
 
@@ -300,59 +354,4 @@ async function recordClick(
     .set({ last_click_at: new Date(), last_activity_at: new Date() })
     .where('id', '=', message.contact_id)
     .execute();
-}
-
-const CLICK_FALLBACK_URL = 'https://thirdwavebbq.com.au';
-
-/**
- * Resolves a redirect URL from a SENT event's metadata link_map.
- *
- * DATA-09: The SENT event link_map is the canonical URL source — written atomically
- * at send time. This function is the sole URL resolution path; CLICK event metadata
- * is write-only audit data and must not be used for URL lookups.
- *
- * DATA-08: The URL is returned verbatim (no re-encoding) to preserve UTM parameters
- * and percent-encoded query strings exactly as the sender intended.
- *
- * @param sentMetadata - The `metadata` object from the SENT event row, or nullish if not found
- * @param linkHash - The SHA-256 hash identifying the link within the link_map
- * @returns The original URL string, or the site fallback URL if not resolvable / unsafe
- */
-export function resolveClickUrl(sentMetadata: unknown, linkHash: string): string {
-  let targetUrl = CLICK_FALLBACK_URL;
-
-  if (sentMetadata != null && typeof sentMetadata === 'object' && 'link_map' in sentMetadata) {
-    const map = (sentMetadata as Record<string, unknown>)['link_map'];
-    if (map != null && typeof map === 'object' && linkHash in map) {
-      const candidate = (map as Record<string, unknown>)[linkHash];
-      if (typeof candidate === 'string') {
-        targetUrl = candidate;
-      }
-    }
-  }
-
-  // Validate protocol to prevent open redirect (block javascript:, data:, etc.)
-  try {
-    const parsed = new URL(targetUrl);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return CLICK_FALLBACK_URL;
-    }
-  } catch {
-    return CLICK_FALLBACK_URL;
-  }
-
-  // Return the raw string — NOT url.href — to avoid double-encoding percent chars
-  return targetUrl;
-}
-
-export function detectMachineOpen(ip: string, userAgent: string): boolean {
-  // Primary: Apple Mail Privacy Protection (17.0.0.0/8)
-  for (const prefix of APPLE_PROXY_PREFIXES) {
-    if (ip.startsWith(prefix)) return true;
-  }
-  // Secondary: known mail proxy user-agents
-  for (const pattern of MACHINE_UA_PATTERNS) {
-    if (pattern.test(userAgent)) return true;
-  }
-  return false;
 }

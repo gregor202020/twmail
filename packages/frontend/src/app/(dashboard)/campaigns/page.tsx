@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { CampaignStatus } from '@twmail/shared/types';
+import { CampaignStatus } from '@/types';
 import type { Campaign, PaginationMeta } from '@/types';
 import { toast } from 'sonner';
 

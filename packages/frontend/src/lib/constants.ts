@@ -1,4 +1,4 @@
-import { CampaignStatus, ContactStatus, UserRole } from '@twmail/shared/types';
+import { CampaignStatus, ContactStatus, UserRole } from '@/types';
 
 export const CAMPAIGN_STATUS_CONFIG: Record<number, { label: string; color: string; dotClass: string }> = {
   [CampaignStatus.DRAFT]: { label: 'Draft', color: 'bg-gray-100 text-gray-600', dotClass: 'bg-gray-400' },

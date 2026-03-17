@@ -23,7 +23,7 @@ export interface AuthUser {
 declare module 'fastify' {
   interface FastifyRequest {
     user?: AuthUser;
-    authType?: 'jwt' | 'api-key';
+    authType?: 'jwt' | 'api_key';
     apiKeyScopes?: string[];
   }
   interface FastifyInstance {
@@ -31,7 +31,6 @@ declare module 'fastify' {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires async signature
 const plugin: FastifyPluginAsync = async (app) => {
   app.decorate('authenticate', async function (request: import('fastify').FastifyRequest) {
     const authHeader = request.headers.authorization;
@@ -55,7 +54,6 @@ const plugin: FastifyPluginAsync = async (app) => {
   });
 };
 
-// eslint-disable-next-line @typescript-eslint/require-await -- JWT verify is sync but we maintain async interface for consistency
 async function authenticateJwt(request: import('fastify').FastifyRequest, token: string): Promise<void> {
   const config = getConfig();
   try {
@@ -107,7 +105,7 @@ async function authenticateApiKey(request: import('fastify').FastifyRequest, tok
         email: key.email,
         role: key.role,
       };
-      request.authType = 'api-key';
+      request.authType = 'api_key';
       request.apiKeyScopes = (key.scopes as string[] | null) ?? [];
 
       // Enforce API key scopes: read = GET only, write = GET + mutating, admin = everything
@@ -138,8 +136,8 @@ async function authenticateApiKey(request: import('fastify').FastifyRequest, tok
         .set({ last_used_at: new Date() })
         .where('id', '=', key.id)
         .execute()
-        .catch((err: unknown) => {
-          console.warn('Failed to update API key last_used_at', { err, keyId: key.id });
+        .catch(() => {
+          // Swallow errors — non-critical
         });
 
       return;

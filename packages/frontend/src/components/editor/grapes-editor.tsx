@@ -8,14 +8,11 @@ import {
   useState,
 } from 'react';
 import type { Editor } from 'grapesjs';
-import GjsEditor from '@grapesjs/react';
 import grapesjs from 'grapesjs';
 import mjml from 'grapesjs-mjml';
 import { Monitor, Smartphone, Eye, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
-import type { Asset } from '@/types';
 
 export interface GrapesEditorRef {
   getHtml: () => string;
@@ -32,8 +29,10 @@ interface GrapesEditorProps {
 export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
   function GrapesEditor({ initialContent, onChange, onSave, saving }, ref) {
     const editorRef = useRef<Editor | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
     const [preview, setPreview] = useState(false);
+    const [ready, setReady] = useState(false);
 
     useImperativeHandle(ref, () => ({
       getHtml: () => {
@@ -53,78 +52,77 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       },
     }));
 
-    const handleEditorReady = useCallback(
-      async (editor: Editor) => {
-        editorRef.current = editor;
+    useEffect(() => {
+      if (!containerRef.current || editorRef.current) return;
 
-        // Load assets from server
+      const editor = grapesjs.init({
+        container: containerRef.current,
+        height: '100%',
+        width: 'auto',
+        storageManager: false,
+        plugins: [mjml],
+        deviceManager: {
+          devices: [
+            { name: 'Desktop', width: '' },
+            { name: 'Mobile portrait', width: '375px' },
+          ],
+        },
+      });
+
+      editorRef.current = editor;
+
+      // Load initial content if provided
+      if (initialContent) {
         try {
-          const assets = await api.get<{ data: Asset[] }>('/assets');
-          if (assets?.data) {
-            editor.AssetManager.add(
-              assets.data.map((a) => ({
-                src: a.url,
-                name: a.filename,
-                type: 'image' as const,
-              }))
-            );
-          }
-        } catch {
-          // Assets loading is non-critical
-        }
-
-        // Configure asset upload
-        editor.on('asset:upload:start', () => {
-          // Could show loading state
-        });
-
-        editor.on('asset:upload:response', (response: unknown) => {
-          // Response handled by custom upload
-          return response;
-        });
-
-        // Load initial content if provided
-        if (initialContent) {
-          try {
-            const parsed = JSON.parse(initialContent);
-            if (parsed && typeof parsed === 'object' && (parsed.pages || parsed.styles)) {
-              editor.loadProjectData(parsed);
-            } else {
-              editor.setComponents(initialContent);
-            }
-          } catch {
-            // Not JSON, treat as HTML
+          const parsed = JSON.parse(initialContent);
+          if (parsed && typeof parsed === 'object' && (parsed.pages || parsed.styles)) {
+            editor.loadProjectData(parsed);
+          } else {
             editor.setComponents(initialContent);
           }
+        } catch {
+          editor.setComponents(initialContent);
         }
-      },
-      [initialContent]
-    );
+      }
+
+      setReady(true);
+
+      return () => {
+        editor.destroy();
+        editorRef.current = null;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-    const handleUpdate = useCallback(() => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      debounceRef.current = setTimeout(() => {
-        if (!editorRef.current || !onChange) return;
-        const result = editorRef.current.runCommand('mjml-code-to-html') as {
-          html: string;
-          errors: Array<{ formattedMessage: string }>;
-        };
-        const html = result.html ?? '';
-        const json = JSON.stringify(editorRef.current.getProjectData());
-        onChange(html, json);
-      }, 500);
-    }, [onChange]);
-
     useEffect(() => {
-      return () => {
-        if (debounceRef.current) {
-          clearTimeout(debounceRef.current);
-        }
+      if (!ready || !editorRef.current || !onChange) return;
+      const editor = editorRef.current;
+
+      const handleUpdate = () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          const result = editor.runCommand('mjml-code-to-html') as {
+            html: string;
+            errors: Array<{ formattedMessage: string }>;
+          };
+          const html = result.html ?? '';
+          const json = JSON.stringify(editor.getProjectData());
+          onChange(html, json);
+        }, 500);
       };
-    }, []);
+
+      editor.on('component:update', handleUpdate);
+      editor.on('component:add', handleUpdate);
+      editor.on('component:remove', handleUpdate);
+
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        editor.off('component:update', handleUpdate);
+        editor.off('component:add', handleUpdate);
+        editor.off('component:remove', handleUpdate);
+      };
+    }, [ready, onChange]);
 
     const toggleViewport = useCallback(
       (mode: 'desktop' | 'mobile') => {
@@ -136,7 +134,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
           editorRef.current.setDevice('Desktop');
         }
       },
-      []
+      [],
     );
 
     const togglePreview = useCallback(() => {
@@ -195,54 +193,8 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         </div>
 
         {/* GrapesJS editor */}
-        <div className={cn('flex-1 relative')}>
-          <GjsEditor
-            grapesjs={grapesjs}
-            grapesjsCss="https://unpkg.com/grapesjs/dist/css/grapes.min.css"
-            plugins={[mjml]}
-            options={{
-              height: '100%',
-              storageManager: false,
-              deviceManager: {
-                devices: [
-                  { name: 'Desktop', width: '' },
-                  { name: 'Mobile portrait', width: '375px' },
-                ],
-              },
-              assetManager: {
-                uploadFile: async (ev: DragEvent | Event) => {
-                  const files =
-                    (ev as DragEvent).dataTransfer?.files ||
-                    (ev.target as HTMLInputElement)?.files;
-                  if (!files) return;
-
-                  for (let i = 0; i < files.length; i++) {
-                    const formData = new FormData();
-                    formData.append('file', files[i]);
-                    try {
-                      const result = await api.upload<{ data: Asset }>(
-                        '/assets/upload',
-                        formData
-                      );
-                      if (result?.data) {
-                        editorRef.current?.AssetManager.add({
-                          src: result.data.url,
-                          name: result.data.filename,
-                          type: 'image',
-                        });
-                      }
-                    } catch {
-                      // Upload error - silently fail
-                    }
-                  }
-                },
-              },
-            }}
-            onReady={handleEditorReady}
-            onUpdate={handleUpdate}
-          />
-        </div>
+        <div className={cn('flex-1 relative')} ref={containerRef} />
       </div>
     );
-  }
+  },
 );

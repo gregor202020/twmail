@@ -1199,7 +1199,7 @@ async function main() {
     category: t.category,
     content_html: t.content_html,
     content_json: {},
-    thumbnail_url: null,
+    thumbnail_url: '',
     is_default: true,
   }));
 

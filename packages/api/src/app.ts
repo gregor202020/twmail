@@ -2,7 +2,6 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
-import * as Sentry from '@sentry/node';
 import { getConfig } from './config.js';
 import type { Config } from './config.js';
 import { errorHandlerPlugin } from './plugins/error-handler.js';
@@ -33,13 +32,13 @@ const PII_REDACT_PATHS = [
   '*.email',
 ];
 
-function buildLogger(config: Config) {
+function buildLogger(cfg: Config) {
   const base = {
-    level: config.LOG_LEVEL,
+    level: cfg.LOG_LEVEL,
     redact: { paths: PII_REDACT_PATHS, censor: '[REDACTED]' },
   };
 
-  if (config.NODE_ENV !== 'production') {
+  if (cfg.NODE_ENV !== 'production') {
     return {
       ...base,
       transport: {
@@ -53,21 +52,14 @@ function buildLogger(config: Config) {
 }
 
 export async function buildApp() {
-  const config = getConfig();
+  const cfg = getConfig();
 
   const app = Fastify({
-    logger: buildLogger(config),
+    logger: buildLogger(cfg),
   });
 
-  // Register Sentry error handler BEFORE other plugins so it captures all errors
-  Sentry.setupFastifyErrorHandler(app);
-
-  if (config.NODE_ENV === 'production' && !config.SENTRY_DSN) {
-    app.log.warn('SENTRY_DSN not configured — Sentry is disabled in production');
-  }
-
   // Plugins
-  const rawOrigins = config.ALLOWED_ORIGINS;
+  const rawOrigins = cfg.ALLOWED_ORIGINS;
   const allowedOrigins = new Set(
     rawOrigins
       .split(',')
@@ -86,7 +78,7 @@ export async function buildApp() {
   });
 
   await app.register(helmet, {
-    contentSecurityPolicy: false, // Pure API — no HTML pages served; CSP would interfere with tracking pixel
+    contentSecurityPolicy: false,
   });
 
   await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });

@@ -1,6 +1,13 @@
 import type { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 // ============================================================================
+// Helper column types
+// ============================================================================
+
+type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
+type NullableTimestamp = ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+
+// ============================================================================
 // Database interface — all tables
 // ============================================================================
 
@@ -16,9 +23,9 @@ export interface Database {
   campaigns: CampaignsTable;
   campaign_variants: CampaignVariantsTable;
   campaign_holdback_contacts: CampaignHoldbackContactsTable;
+  messages: MessagesTable;
   events: EventsTable;
   campaign_stats_daily: CampaignStatsDailyTable;
-  messages: MessagesTable;
   automations: AutomationsTable;
   automation_steps: AutomationStepsTable;
   automation_log: AutomationLogTable;
@@ -36,12 +43,12 @@ export interface Database {
 export interface UsersTable {
   id: Generated<number>;
   email: string;
-  password_hash: string;
-  name: string;
-  role: number;
-  last_login_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  password_hash: Generated<string>;
+  name: Generated<string>;
+  role: Generated<number>;
+  last_login_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type User = Selectable<UsersTable>;
@@ -55,13 +62,14 @@ export type UserUpdate = Updateable<UsersTable>;
 export interface ApiKeysTable {
   id: Generated<number>;
   user_id: number;
-  name: string;
-  key_prefix: string;
-  key_hash: string;
-  scopes: string[];
-  last_used_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  expires_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
+  name: Generated<string>;
+  key_prefix: Generated<string>;
+  key_hash: Generated<string>;
+  scopes: Generated<string[]>;
+  expires_at: NullableTimestamp;
+  last_used_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type ApiKey = Selectable<ApiKeysTable>;
@@ -75,25 +83,25 @@ export type ApiKeyUpdate = Updateable<ApiKeysTable>;
 export interface ContactsTable {
   id: Generated<number>;
   email: string;
+  first_name: Generated<string>;
+  last_name: Generated<string>;
+  phone: Generated<string>;
+  company: Generated<string>;
+  city: Generated<string>;
+  country: Generated<string>;
+  timezone: Generated<string>;
   status: Generated<number>;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  company: string | null;
-  city: string | null;
-  country: string | null;
-  timezone: string | null;
   custom_fields: Generated<Record<string, unknown>>;
-  source: string | null;
+  source: Generated<string>;
   engagement_score: Generated<number>;
-  engagement_tier: Generated<number>;
-  last_open_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  last_click_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  last_activity_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  subscribed_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  unsubscribed_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  engagement_tier: number | null;
+  last_open_at: NullableTimestamp;
+  last_click_at: NullableTimestamp;
+  last_activity_at: NullableTimestamp;
+  subscribed_at: NullableTimestamp;
+  unsubscribed_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Contact = Selectable<ContactsTable>;
@@ -106,11 +114,11 @@ export type ContactUpdate = Updateable<ContactsTable>;
 
 export interface ListsTable {
   id: Generated<number>;
-  name: string;
-  description: string | null;
+  name: Generated<string>;
+  description: Generated<string>;
   type: Generated<number>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type List = Selectable<ListsTable>;
@@ -125,7 +133,7 @@ export interface ContactListsTable {
   contact_id: number;
   list_id: number;
   status: Generated<number>;
-  created_at: Generated<Date>;
+  created_at: Timestamp;
 }
 
 export type ContactList = Selectable<ContactListsTable>;
@@ -137,14 +145,13 @@ export type NewContactList = Insertable<ContactListsTable>;
 
 export interface SegmentsTable {
   id: Generated<number>;
-  name: string;
+  name: Generated<string>;
+  description: Generated<string>;
   type: Generated<number>;
-  rules: Record<string, unknown> | null;
-  description: string | null;
-  cached_count: number | null;
-  cached_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  rules: Generated<Record<string, unknown>>;
+  cached_count: Generated<number>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Segment = Selectable<SegmentsTable>;
@@ -158,7 +165,7 @@ export type SegmentUpdate = Updateable<SegmentsTable>;
 export interface ContactSegmentsTable {
   contact_id: number;
   segment_id: number;
-  created_at: Generated<Date>;
+  created_at: Timestamp;
 }
 
 export type ContactSegment = Selectable<ContactSegmentsTable>;
@@ -170,14 +177,14 @@ export type NewContactSegment = Insertable<ContactSegmentsTable>;
 
 export interface TemplatesTable {
   id: Generated<number>;
-  name: string;
-  category: string | null;
-  content_html: string | null;
-  content_json: Generated<Record<string, unknown>>;
-  thumbnail_url: string | null;
+  name: Generated<string>;
+  category: Generated<string>;
+  content_html: Generated<string>;
+  content_json: Record<string, unknown> | null;
+  thumbnail_url: Generated<string>;
   is_default: Generated<boolean>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Template = Selectable<TemplatesTable>;
@@ -190,36 +197,32 @@ export type TemplateUpdate = Updateable<TemplatesTable>;
 
 export interface CampaignsTable {
   id: Generated<number>;
-  name: string;
+  name: Generated<string>;
   status: Generated<number>;
-  subject: string | null;
-  preview_text: string | null;
+  subject: Generated<string>;
+  preview_text: Generated<string>;
   from_name: Generated<string>;
   from_email: Generated<string>;
-  reply_to: string | null;
+  reply_to: Generated<string>;
   template_id: number | null;
-  content_html: string | null;
+  content_html: Generated<string>;
   content_json: Record<string, unknown> | null;
   segment_id: number | null;
   list_id: number | null;
-  scheduled_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  timezone: Generated<string>;
-  send_started_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  send_completed_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
   ab_test_enabled: Generated<boolean>;
   ab_test_config: Record<string, unknown> | null;
   resend_enabled: Generated<boolean>;
   resend_config: Record<string, unknown> | null;
-  tags: ColumnType<string | null, string | null, string | null>;
-  utm_enabled: ColumnType<boolean, boolean | undefined, boolean | undefined>;
-  utm_source: ColumnType<string | null, string | null, string | null>;
-  utm_medium: ColumnType<string | null, string | null, string | null>;
-  utm_campaign: ColumnType<string | null, string | null, string | null>;
-  utm_content: ColumnType<string | null, string | null, string | null>;
-  ga_tracking: ColumnType<boolean, boolean | undefined, boolean | undefined>;
-  tracking_domain: ColumnType<string | null, string | null, string | null>;
-  send_time_optimization: ColumnType<boolean, boolean | undefined, boolean | undefined>;
   resend_of: number | null;
+  tags: Generated<string[]>;
+  utm_enabled: Generated<boolean>;
+  utm_source: Generated<string>;
+  utm_medium: Generated<string>;
+  utm_campaign: Generated<string>;
+  utm_content: Generated<string>;
+  ga_tracking: Generated<boolean>;
+  tracking_domain: Generated<string>;
+  send_time_optimization: Generated<boolean>;
   total_sent: Generated<number>;
   total_delivered: Generated<number>;
   total_opens: Generated<number>;
@@ -229,8 +232,12 @@ export interface CampaignsTable {
   total_bounces: Generated<number>;
   total_complaints: Generated<number>;
   total_unsubscribes: Generated<number>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  scheduled_at: NullableTimestamp;
+  timezone: Generated<string>;
+  send_started_at: NullableTimestamp;
+  send_completed_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Campaign = Selectable<CampaignsTable>;
@@ -244,22 +251,24 @@ export type CampaignUpdate = Updateable<CampaignsTable>;
 export interface CampaignVariantsTable {
   id: Generated<number>;
   campaign_id: number;
-  variant_name: string;
-  subject: string;
-  preview_text: string | null;
-  content_html: string | null;
+  variant_name: Generated<string>;
+  subject: Generated<string>;
+  content_html: Generated<string>;
   content_json: Record<string, unknown> | null;
-  percentage: number;
+  percentage: Generated<number>;
   is_winner: Generated<boolean>;
   win_probability: number | null;
   total_sent: Generated<number>;
+  total_delivered: Generated<number>;
   total_opens: Generated<number>;
   total_human_opens: Generated<number>;
   total_clicks: Generated<number>;
   total_human_clicks: Generated<number>;
-  unique_clicks: Generated<number>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  total_bounces: Generated<number>;
+  total_complaints: Generated<number>;
+  total_unsubscribes: Generated<number>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type CampaignVariant = Selectable<CampaignVariantsTable>;
@@ -271,49 +280,12 @@ export type CampaignVariantUpdate = Updateable<CampaignVariantsTable>;
 // ============================================================================
 
 export interface CampaignHoldbackContactsTable {
-  id: Generated<number>;
   campaign_id: number;
   contact_id: number;
-  created_at: Generated<Date>;
 }
 
 export type CampaignHoldbackContact = Selectable<CampaignHoldbackContactsTable>;
 export type NewCampaignHoldbackContact = Insertable<CampaignHoldbackContactsTable>;
-
-// ============================================================================
-// events
-// ============================================================================
-
-export interface EventsTable {
-  id: Generated<number>;
-  event_type: number;
-  contact_id: number;
-  campaign_id: number | null;
-  variant_id: number | null;
-  message_id: string | null;
-  event_time: ColumnType<Date, Date | string, Date | string>;
-  metadata: Record<string, unknown> | null;
-  created_at: Generated<Date>;
-}
-
-export type Event = Selectable<EventsTable>;
-export type NewEvent = Insertable<EventsTable>;
-
-// ============================================================================
-// campaign_stats_daily
-// ============================================================================
-
-export interface CampaignStatsDailyTable {
-  campaign_id: number;
-  variant_id: Generated<number>;
-  event_type: number;
-  event_date: ColumnType<Date, Date | string, Date | string>;
-  total_count: Generated<number>;
-  unique_contacts: Generated<number>;
-}
-
-export type CampaignStatsDaily = Selectable<CampaignStatsDailyTable>;
-export type NewCampaignStatsDaily = Insertable<CampaignStatsDailyTable>;
 
 // ============================================================================
 // messages
@@ -325,13 +297,14 @@ export interface MessagesTable {
   variant_id: number | null;
   contact_id: number;
   status: Generated<number>;
-  ses_message_id: string | null;
-  sent_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  delivered_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  first_open_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  first_click_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  ses_message_id: Generated<string>;
+  sent_at: NullableTimestamp;
+  delivered_at: NullableTimestamp;
+  first_open_at: NullableTimestamp;
+  first_click_at: NullableTimestamp;
   is_machine_open: Generated<boolean>;
-  created_at: Generated<Date>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Message = Selectable<MessagesTable>;
@@ -339,18 +312,53 @@ export type NewMessage = Insertable<MessagesTable>;
 export type MessageUpdate = Updateable<MessagesTable>;
 
 // ============================================================================
+// events (partitioned by event_time)
+// ============================================================================
+
+export interface EventsTable {
+  id: Generated<number>;
+  event_type: number;
+  contact_id: number | null;
+  campaign_id: number | null;
+  variant_id: number | null;
+  message_id: string | null;
+  event_time: ColumnType<Date, Date | string | undefined, Date | string>;
+  metadata: Record<string, unknown> | null;
+}
+
+export type Event = Selectable<EventsTable>;
+export type NewEvent = Insertable<EventsTable>;
+
+// ============================================================================
+// campaign_stats_daily
+// ============================================================================
+
+export interface CampaignStatsDailyTable {
+  id: Generated<number>;
+  campaign_id: number;
+  variant_id: number | null;
+  event_type: number;
+  event_date: ColumnType<Date, Date | string, Date | string>;
+  total_count: Generated<number>;
+  unique_contacts: Generated<number>;
+}
+
+export type CampaignStatsDaily = Selectable<CampaignStatsDailyTable>;
+export type NewCampaignStatsDaily = Insertable<CampaignStatsDailyTable>;
+
+// ============================================================================
 // automations
 // ============================================================================
 
 export interface AutomationsTable {
   id: Generated<number>;
-  name: string;
+  name: Generated<string>;
   type: number;
-  trigger_config: Record<string, unknown>;
+  trigger_config: Generated<Record<string, unknown>>;
   enabled: Generated<boolean>;
-  last_run_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  last_run_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Automation = Selectable<AutomationsTable>;
@@ -364,27 +372,29 @@ export type AutomationUpdate = Updateable<AutomationsTable>;
 export interface AutomationStepsTable {
   id: Generated<number>;
   automation_id: number;
-  step_order: number;
+  step_order: Generated<number>;
   action: number;
-  config: Record<string, unknown>;
-  created_at: Generated<Date>;
+  config: Generated<Record<string, unknown>>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type AutomationStep = Selectable<AutomationStepsTable>;
 export type NewAutomationStep = Insertable<AutomationStepsTable>;
+export type AutomationStepUpdate = Updateable<AutomationStepsTable>;
 
 // ============================================================================
-// automation_log
+// automation_log (partitioned by executed_at)
 // ============================================================================
 
 export interface AutomationLogTable {
   id: Generated<number>;
-  automation_id: number;
-  contact_id: number;
+  automation_id: number | null;
   step_id: number | null;
-  status: number;
-  metadata: Record<string, unknown> | null;
-  created_at: Generated<Date>;
+  contact_id: number | null;
+  status: Generated<number>;
+  result: Record<string, unknown> | null;
+  executed_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
 export type AutomationLog = Selectable<AutomationLogTable>;
@@ -396,15 +406,15 @@ export type NewAutomationLog = Insertable<AutomationLogTable>;
 
 export interface AssetsTable {
   id: Generated<number>;
-  filename: string;
-  original_name: string;
-  mime_type: string;
-  size_bytes: number;
+  filename: Generated<string>;
+  original_name: Generated<string>;
+  mime_type: Generated<string>;
+  size_bytes: Generated<number>;
   storage_type: Generated<number>;
-  url: string;
-  thumbnail_url: string | null;
+  url: Generated<string>;
+  thumbnail_url: Generated<string>;
   campaign_id: number | null;
-  created_at: Generated<Date>;
+  created_at: Timestamp;
 }
 
 export type Asset = Selectable<AssetsTable>;
@@ -423,10 +433,11 @@ export interface ImportsTable {
   updated_contacts: Generated<number>;
   skipped: Generated<number>;
   mapping_config: Record<string, unknown> | null;
-  mapping_preset: string | null;
-  errors: Record<string, unknown> | null;
-  created_at: Generated<Date>;
-  completed_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  errors: Generated<Record<string, unknown>[]>;
+  list_id: number | null;
+  update_existing: Generated<boolean>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Import = Selectable<ImportsTable>;
@@ -439,13 +450,14 @@ export type ImportUpdate = Updateable<ImportsTable>;
 
 export interface WebhookEndpointsTable {
   id: Generated<number>;
-  url: string;
-  secret: string;
-  events: string[];
+  url: Generated<string>;
+  secret: Generated<string>;
+  events: Generated<string[]>;
   active: Generated<boolean>;
-  last_triggered_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  last_triggered_at: NullableTimestamp;
   failure_count: Generated<number>;
-  created_at: Generated<Date>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type WebhookEndpoint = Selectable<WebhookEndpointsTable>;
@@ -459,21 +471,23 @@ export type WebhookEndpointUpdate = Updateable<WebhookEndpointsTable>;
 export interface WebhookDeliveriesTable {
   id: Generated<number>;
   endpoint_id: number;
-  event_type: string;
-  payload: Record<string, unknown>;
+  event_type: Generated<string>;
+  payload: Generated<Record<string, unknown>>;
   status: Generated<number>;
   response_code: number | null;
-  response_body: string | null;
+  response_body: Generated<string>;
   attempts: Generated<number>;
-  next_retry_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
-  created_at: Generated<Date>;
+  next_retry_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type WebhookDelivery = Selectable<WebhookDeliveriesTable>;
 export type NewWebhookDelivery = Insertable<WebhookDeliveriesTable>;
+export type WebhookDeliveryUpdate = Updateable<WebhookDeliveriesTable>;
 
 // ============================================================================
-// settings
+// settings (singleton row, id always 1)
 // ============================================================================
 
 export interface SettingsTable {
@@ -482,9 +496,9 @@ export interface SettingsTable {
   default_sender_email: Generated<string>;
   default_sender_name: Generated<string>;
   timezone: Generated<string>;
-  physical_address: Generated<string>; // empty string = not configured (CAN-SPAM COMP-06)
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  physical_address: Generated<string>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export type Settings = Selectable<SettingsTable>;

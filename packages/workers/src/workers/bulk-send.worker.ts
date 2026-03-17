@@ -6,9 +6,8 @@ import {
   ContactStatus,
   MessageStatus,
   EventType,
-  resolveSegmentContactIds,
 } from '@twmail/shared';
-import type { Kysely, ExpressionBuilder } from 'kysely';
+import type { ExpressionBuilder } from 'kysely';
 import type { Database } from '@twmail/shared';
 import { sendEmail } from '../ses-client.js';
 import { processMergeTags } from '../merge-tags.js';
@@ -18,8 +17,11 @@ import { logger } from '../logger.js';
 
 const SES_CONFIG_SET = process.env['SES_CONFIGURATION_SET'] ?? 'marketing';
 
-// BUG-04: Atomic decrement-and-check via Lua script
-// Only one concurrent worker will receive shouldComplete === 1
+/**
+ * BUG-04: Atomic decrement-and-check via Lua script.
+ * Only one concurrent worker will receive shouldComplete === 1,
+ * ensuring exactly-once campaign completion transition.
+ */
 const DECR_AND_CHECK_LUA = `
   local key = KEYS[1]
   local current = redis.call('DECR', key)
@@ -30,13 +32,22 @@ const DECR_AND_CHECK_LUA = `
   return 0
 `;
 
+export interface BulkSendJobData {
+  contactId: number;
+  campaignId: number;
+  variantId?: number;
+}
+
 /**
- * Check if an email has already been sent for the given campaign/contact pair.
- * Returns true if a message record already exists (skip), false if safe to send.
- *
- * Exported for unit testing without a live database.
+ * Idempotency check: returns true if a message record already exists for
+ * this campaign/contact pair. The UNIQUE constraint on (campaign_id, contact_id)
+ * in the messages table also guards against duplicates at the DB level.
  */
-export async function shouldSkipSend(db: Kysely<Database>, campaignId: number, contactId: number): Promise<boolean> {
+export async function shouldSkipSend(
+  db: ReturnType<typeof getDb>,
+  campaignId: number,
+  contactId: number,
+): Promise<boolean> {
   const existing = await db
     .selectFrom('messages')
     .select(['id'])
@@ -47,17 +58,27 @@ export async function shouldSkipSend(db: Kysely<Database>, campaignId: number, c
   return existing !== undefined;
 }
 
-export interface BulkSendJobData {
-  contactId: number;
-  campaignId: number;
-  variantId?: number;
-}
-
-export interface CampaignSendJobData {
-  campaignId: number;
-}
-
-// This worker processes individual email sends from the bulk-send queue
+/**
+ * Bulk-send worker: processes individual email sends.
+ *
+ * Each job represents one email to one contact for one campaign (optionally
+ * a specific A/B variant). The worker:
+ *   1. Loads contact, campaign, variant
+ *   2. Validates status (active contact, non-cancelled campaign)
+ *   3. Dedup check (shouldSkipSend)
+ *   4. Creates message record (QUEUED)
+ *   5. Processes merge tags on subject + HTML
+ *   6. Validates output (no relative URLs, no uncompiled MJML)
+ *   7. Injects tracking pixel + rewrites links
+ *   8. Builds headers (List-Unsubscribe per RFC 8058)
+ *   9. Sends via SES
+ *  10. Updates message to SENT with ses_message_id
+ *  11. Creates SENT event with link_map metadata
+ *  12. Increments campaign.total_sent (and variant.total_sent if applicable)
+ *  13. Decrements Redis counter; if 0, marks campaign SENT
+ *
+ * Concurrency: 10, rate-limited to 14/sec to stay within SES limits.
+ */
 export function createBulkSendWorker(): Worker {
   const redis = getRedis();
 
@@ -67,7 +88,7 @@ export function createBulkSendWorker(): Worker {
       const { contactId, campaignId, variantId } = job.data;
       const db = getDb();
 
-      // Fetch contact
+      // Load contact (must be ACTIVE)
       const contact = await db
         .selectFrom('contacts')
         .selectAll()
@@ -76,18 +97,27 @@ export function createBulkSendWorker(): Worker {
         .executeTakeFirst();
 
       if (!contact) {
-        // Contact no longer active, skip
+        await decrementCounter(redis, db, campaignId);
         return { skipped: true, reason: 'contact_not_active' };
       }
 
-      // Fetch campaign
-      const campaign = await db.selectFrom('campaigns').selectAll().where('id', '=', campaignId).executeTakeFirst();
+      // Load campaign
+      const campaign = await db
+        .selectFrom('campaigns')
+        .selectAll()
+        .where('id', '=', campaignId)
+        .executeTakeFirst();
 
-      if (!campaign || campaign.status === CampaignStatus.CANCELLED || campaign.status === CampaignStatus.PAUSED) {
+      if (
+        !campaign ||
+        campaign.status === CampaignStatus.CANCELLED ||
+        campaign.status === CampaignStatus.PAUSED
+      ) {
+        await decrementCounter(redis, db, campaignId);
         return { skipped: true, reason: 'campaign_not_active' };
       }
 
-      // Get HTML content (from variant if A/B test, otherwise campaign)
+      // Resolve content: variant overrides campaign if A/B test
       let html: string;
       let subject: string;
       let previewText: string | null = null;
@@ -100,12 +130,13 @@ export function createBulkSendWorker(): Worker {
           .executeTakeFirst();
 
         if (!variant) {
+          await decrementCounter(redis, db, campaignId);
           return { skipped: true, reason: 'variant_not_found' };
         }
 
         html = variant.content_html ?? campaign.content_html ?? '';
         subject = variant.subject;
-        previewText = variant.preview_text ?? campaign.preview_text;
+        previewText = campaign.preview_text;
       } else {
         html = campaign.content_html ?? '';
         subject = campaign.subject ?? '';
@@ -113,28 +144,28 @@ export function createBulkSendWorker(): Worker {
       }
 
       if (!html || !subject) {
+        await decrementCounter(redis, db, campaignId);
         return { skipped: true, reason: 'missing_content' };
       }
 
-      // OPS-04: Defensive guard — reject uncompiled MJML source
+      // OPS-04: Defensive guard -- reject uncompiled MJML source
       if (isMjmlSource(html)) {
         logger.error({ campaignId }, 'OPS-04: Received uncompiled MJML source in bulk-send worker');
+        await decrementCounter(redis, db, campaignId);
         return { skipped: true, reason: 'uncompiled_mjml' };
       }
 
       // OPS-05: Reject relative URLs before processing
       assertAbsoluteUrls(html, campaignId);
 
-      // BUG-02: Idempotency check — skip if already sent for this campaign/contact
+      // BUG-02: Idempotency check -- skip if already sent for this campaign/contact
       const skipSend = await shouldSkipSend(db, campaignId, contactId);
       if (skipSend) {
-        // Already sent or in progress — skip this retry
-        // Still decrement the counter so campaign completion isn't blocked
-        await redis.eval(DECR_AND_CHECK_LUA, 1, `twmail:remaining:${campaignId}`);
+        await decrementCounter(redis, db, campaignId);
         return { skipped: true, reason: 'already_sent' };
       }
 
-      // Create message record
+      // Create message record (status=QUEUED)
       const message = await db
         .insertInto('messages')
         .values({
@@ -153,31 +184,34 @@ export function createBulkSendWorker(): Worker {
       let shouldDecrementOnError = true;
 
       try {
-        // Process merge tags
+        // Process merge tags on subject and HTML
         html = processMergeTags(html, contact, messageId);
         subject = processMergeTags(subject, contact, messageId);
 
-        // Inject tracking
+        // Inject tracking pixel
         html = injectTrackingPixel(html, messageId);
+
+        // Rewrite links for click tracking
         const linkResult = rewriteLinks(html, messageId);
         html = linkResult.html;
         const linkMap = linkResult.linkMap;
 
-        // Add preview text if present
+        // Inject preview text if present
         if (previewText) {
           previewText = processMergeTags(previewText, contact, messageId);
           html = injectPreviewText(html, previewText);
         }
 
-        // Get unsubscribe headers
+        // Get unsubscribe headers (RFC 8058)
         const headers = getUnsubscribeHeaders(messageId);
-
-        // Set SES configuration set header
         headers['X-SES-CONFIGURATION-SET'] = SES_CONFIG_SET;
 
-        // Send via SES
-        const fromAddress = campaign.from_name ? `${campaign.from_name} <${campaign.from_email}>` : campaign.from_email;
+        // Build from address
+        const fromAddress = campaign.from_name
+          ? `${campaign.from_name} <${campaign.from_email}>`
+          : campaign.from_email;
 
+        // Send via SES
         const sesMessageId = await sendEmail({
           from: fromAddress,
           to: contact.email,
@@ -189,18 +223,18 @@ export function createBulkSendWorker(): Worker {
           messageId,
         });
 
-        // Update message status
+        // Update message status to SENT
         await db
           .updateTable('messages')
           .set({
             status: MessageStatus.SENT,
-            ses_message_id: sesMessageId ?? null,
+            ses_message_id: sesMessageId ?? undefined,
             sent_at: new Date(),
           })
           .where('id', '=', messageId)
           .execute();
 
-        // Create sent event (include link_map so click tracking can resolve URLs)
+        // Create SENT event with link_map metadata
         await db
           .insertInto('events')
           .values({
@@ -214,17 +248,34 @@ export function createBulkSendWorker(): Worker {
           })
           .execute();
 
-        // Increment campaign send counter (only on confirmed SES send)
+        // Increment campaign.total_sent
         await db
           .updateTable('campaigns')
-          .set((eb: ExpressionBuilder<Database, 'campaigns'>) => ({ total_sent: eb('total_sent', '+', 1) }))
+          .set((eb: ExpressionBuilder<Database, 'campaigns'>) => ({
+            total_sent: eb('total_sent', '+', 1),
+          }))
           .where('id', '=', campaignId)
           .execute();
 
-        // BUG-04: Atomic decrement-and-check via Lua script
-        const shouldComplete = (await redis.eval(DECR_AND_CHECK_LUA, 1, `twmail:remaining:${campaignId}`)) as number;
+        // If variant, also increment variant.total_sent
+        if (variantId) {
+          await db
+            .updateTable('campaign_variants')
+            .set((eb: ExpressionBuilder<Database, 'campaign_variants'>) => ({
+              total_sent: eb('total_sent', '+', 1),
+            }))
+            .where('id', '=', variantId)
+            .execute();
+        }
 
-        // Counter was decremented on the success path — skip the finally block decrement
+        // BUG-04: Atomic decrement-and-check via Lua script
+        const shouldComplete = (await redis.eval(
+          DECR_AND_CHECK_LUA,
+          1,
+          `twmail:remaining:${campaignId}`,
+        )) as number;
+
+        // Counter was decremented on the success path
         shouldDecrementOnError = false;
 
         if (shouldComplete === 1) {
@@ -236,20 +287,32 @@ export function createBulkSendWorker(): Worker {
             .returningAll()
             .executeTakeFirst();
 
+          logger.info({ campaignId }, 'Campaign send complete');
+
           // BUG-06: Trigger resend-to-non-openers if enabled
           if (updatedCampaign?.resend_enabled && updatedCampaign?.resend_config) {
             const config = updatedCampaign.resend_config as { wait_hours?: number };
             const waitHours = config.wait_hours ?? 72;
-            const resendQueue = new Queue('resend', { connection: redis as unknown as ConnectionOptions });
-            await resendQueue.add('evaluate', { campaignId }, { delay: waitHours * 3600 * 1000 });
+            const resendQueue = new Queue('resend', {
+              connection: redis as unknown as ConnectionOptions,
+            });
+            await resendQueue.add(
+              'evaluate',
+              { campaignId },
+              { delay: waitHours * 3600 * 1000 },
+            );
             await resendQueue.close();
+            logger.info(
+              { campaignId, waitHours },
+              'Scheduled resend-to-non-openers evaluation',
+            );
           }
         }
 
         return { sent: true, messageId, sesMessageId };
       } finally {
         // DATA-07: If the success path did not decrement the counter (error occurred),
-        // decrement now so the campaign can still transition to SENT.
+        // decrement now so the campaign completion is not blocked by a failed job.
         if (shouldDecrementOnError) {
           try {
             const shouldComplete = (await redis.eval(
@@ -264,19 +327,23 @@ export function createBulkSendWorker(): Worker {
                 .where('id', '=', campaignId)
                 .where('status', '=', CampaignStatus.SENDING)
                 .execute();
+              logger.info({ campaignId }, 'Campaign completed (final job errored but counter hit zero)');
             }
           } catch (finallyErr) {
-            logger.error({ err: finallyErr, campaignId, contactId }, 'Failed to decrement counter in finally block');
+            logger.error(
+              { err: finallyErr, campaignId, contactId },
+              'Failed to decrement counter in finally block',
+            );
           }
         }
       }
     },
     {
       connection: redis as unknown as ConnectionOptions,
-      concurrency: 25,
+      concurrency: 10,
       limiter: {
-        max: 40,
-        duration: 1000, // 40 emails/sec
+        max: 14,
+        duration: 1000, // 14 emails/sec (SES rate limit)
       },
     },
   );
@@ -296,145 +363,40 @@ export function createBulkSendWorker(): Worker {
   return worker;
 }
 
-// Campaign orchestrator: resolves recipients and enqueues individual send jobs
-export function createCampaignSendWorker(): Worker {
-  const redis = getRedis();
-
-  const worker = new Worker<CampaignSendJobData>(
-    'campaign-send',
-    async (job: Job<CampaignSendJobData>) => {
-      const { campaignId } = job.data;
-      const db = getDb();
-
-      const campaign = await db.selectFrom('campaigns').selectAll().where('id', '=', campaignId).executeTakeFirst();
-
-      if (!campaign) {
-        return { error: 'campaign_not_found' };
-      }
-
-      // Resolve recipient contacts
-      let contactIds: number[] = [];
-
-      if (campaign.segment_id) {
-        // DATA-11: Use resolveSegmentContactIds to handle both static and dynamic segments.
-        // Static segments use the contact_segments pivot table; dynamic segments evaluate
-        // rules via buildRuleFilter — same logic as getSegmentCount (single source of truth).
-        contactIds = await resolveSegmentContactIds(campaign.segment_id);
-      } else if (campaign.list_id) {
-        // Resolve from list
-        const contacts = await db
-          .selectFrom('contacts')
-          .select('contacts.id')
-          .where('contacts.status', '=', ContactStatus.ACTIVE)
-          .innerJoin('contact_lists', 'contact_lists.contact_id', 'contacts.id')
-          .where('contact_lists.list_id', '=', campaign.list_id)
-          .execute();
-        contactIds = contacts.map((c) => c.id);
-      }
-
-      if (contactIds.length === 0) {
-        await db
-          .updateTable('campaigns')
-          .set({ status: CampaignStatus.SENT, send_completed_at: new Date() })
-          .where('id', '=', campaignId)
-          .execute();
-        return { sent: 0 };
-      }
-
-      // Handle A/B test variant assignment
-      const bulkSendQueue = new Queue('bulk-send', { connection: redis as unknown as ConnectionOptions });
-
-      if (campaign.ab_test_enabled && campaign.ab_test_config) {
-        const abConfig = campaign.ab_test_config as {
-          test_percentage?: number;
-          winner_wait_hours?: number;
-        };
-        const testPct = abConfig.test_percentage ?? 20;
-        const testSize = Math.ceil(contactIds.length * (testPct / 100));
-
-        // Shuffle contacts for random assignment (Fisher-Yates)
-        const shuffled = [...contactIds];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
-        }
-        const testContacts = shuffled.slice(0, testSize);
-        const holdbackContacts = shuffled.slice(testSize);
-
-        // Fetch variants
-        const variants = await db
-          .selectFrom('campaign_variants')
-          .selectAll()
-          .where('campaign_id', '=', campaignId)
-          .execute();
-
-        if (variants.length >= 2) {
-          // Split test contacts among variants
-          const perVariant = Math.ceil(testContacts.length / variants.length);
-          for (let i = 0; i < variants.length; i++) {
-            const start = i * perVariant;
-            const end = Math.min(start + perVariant, testContacts.length);
-            const variantContacts = testContacts.slice(start, end);
-
-            for (const contactId of variantContacts) {
-              await bulkSendQueue.add('send', {
-                contactId,
-                campaignId,
-                variantId: variants[i]!.id,
-              });
-            }
-          }
-
-          // Set Redis counter for A/B path (only test contacts are enqueued)
-          await redis.set(`twmail:remaining:${campaignId}`, testContacts.length, 'EX', 604800);
-
-          // BUG-03: Persist holdback to PostgreSQL (survives Redis restart/eviction)
-          if (holdbackContacts.length > 0) {
-            const holdbackRows = holdbackContacts.map((contactId: number) => ({
-              campaign_id: campaignId,
-              contact_id: contactId,
-            }));
-            for (let i = 0; i < holdbackRows.length; i += 500) {
-              const batch = holdbackRows.slice(i, i + 500);
-              await db.insertInto('campaign_holdback_contacts').values(batch).execute();
-            }
-
-            // Schedule A/B evaluation job
-            const waitHours = abConfig.winner_wait_hours ?? 4;
-            const abEvalQueue = new Queue('ab-eval', { connection: redis as unknown as ConnectionOptions });
-            await abEvalQueue.add('evaluate', { campaignId }, { delay: waitHours * 3600 * 1000 });
-            await abEvalQueue.close();
-          }
-        }
-      } else {
-        // Set Redis counter for standard path (all contacts are enqueued)
-        await redis.set(`twmail:remaining:${campaignId}`, contactIds.length, 'EX', 604800);
-
-        // Standard send: enqueue all contacts
-        for (const contactId of contactIds) {
-          await bulkSendQueue.add('send', { contactId, campaignId });
-        }
-      }
-
-      await bulkSendQueue.close();
-
-      return { queued: contactIds.length };
-    },
-    {
-      connection: redis as unknown as ConnectionOptions,
-      concurrency: 5,
-    },
-  );
-
-  worker.on('failed', (job, err) => {
-    logger.error({ jobId: job?.id, err }, 'Campaign send job failed');
-  });
-
-  return worker;
+/**
+ * Helper: decrement the Redis counter for a skipped job.
+ * This is called on early-exit paths where no message record was created.
+ */
+async function decrementCounter(
+  redis: ReturnType<typeof getRedis>,
+  db: ReturnType<typeof getDb>,
+  campaignId: number,
+): Promise<void> {
+  try {
+    const shouldComplete = (await redis.eval(
+      DECR_AND_CHECK_LUA,
+      1,
+      `twmail:remaining:${campaignId}`,
+    )) as number;
+    if (shouldComplete === 1) {
+      await db
+        .updateTable('campaigns')
+        .set({ status: CampaignStatus.SENT, send_completed_at: new Date() })
+        .where('id', '=', campaignId)
+        .where('status', '=', CampaignStatus.SENDING)
+        .execute();
+      logger.info({ campaignId }, 'Campaign completed (all remaining jobs skipped)');
+    }
+  } catch (err) {
+    logger.error({ err, campaignId }, 'Failed to decrement counter for skipped job');
+  }
 }
 
+/**
+ * Inject hidden preview text after <body> tag.
+ * This text appears in inbox previews but is invisible in the email body.
+ */
 function injectPreviewText(html: string, previewText: string): string {
-  // Inject hidden preview text after <body> tag
   const previewHtml = `<div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${previewText}</div>`;
 
   if (html.includes('<body')) {

@@ -78,11 +78,13 @@ export function Sidebar() {
             <DropdownMenuTrigger className="w-7 h-7 bg-white/10 rounded-full flex items-center justify-center text-[11px] text-white/60 font-semibold hover:bg-white/20 transition-colors">
               G
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="end" className="w-40">
-              <DropdownMenuItem render={<Link href="/settings" />}>
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-status-danger" onClick={() => logout()}>
+            <DropdownMenuContent align="end" className="w-40">
+              <Link href="/settings">
+                <DropdownMenuItem>
+                  Profile
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuItem variant="destructive" onClick={() => logout()}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Log out
               </DropdownMenuItem>

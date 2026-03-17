@@ -1,9 +1,6 @@
 node_modules/
 dist/
-*.js
-*.d.ts
-*.js.map
-!jest.config.js
+.next/
 
 # Environment
 .env
@@ -20,10 +17,13 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Docker
+# Docker persistent data
 pgdata/
 redisdata/
 assets/
+
+# SSL certificates
+nginx/certs/
 
 # Logs
 *.log
@@ -31,4 +31,6 @@ npm-debug.log*
 
 # Coverage
 coverage/
+
+# TypeScript build info
 tsconfig.tsbuildinfo

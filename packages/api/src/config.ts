@@ -15,14 +15,19 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   ALLOWED_ORIGINS: z.string().default(''),
   SENTRY_DSN: z.string().optional(),
+  BASE_URL: z.string().default('http://localhost:3000'),
+  ASSETS_DIR: z.string().default('/data/assets'),
+  SES_SENDING_DOMAIN: z.string().default(''),
 });
 
 export type Config = z.infer<typeof envSchema>;
 
-let config: Config | undefined;
+let cached: Config | undefined;
+
+export const config: Config = undefined as unknown as Config;
 
 export function getConfig(): Config {
-  if (!config) {
+  if (!cached) {
     const result = envSchema.safeParse(process.env);
     if (!result.success) {
       const errors = result.error.flatten().fieldErrors;
@@ -31,7 +36,9 @@ export function getConfig(): Config {
         .join('\n');
       throw new Error(`Invalid environment variables:\n${missing}`);
     }
-    config = result.data;
+    cached = result.data;
+    // Mutate the exported config object so direct imports also work
+    Object.assign(config as object, cached);
   }
-  return config;
+  return cached;
 }
