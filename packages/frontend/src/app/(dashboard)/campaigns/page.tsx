@@ -40,9 +40,9 @@ export default function CampaignsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => api.post<Campaign>('/campaigns', { name: 'Untitled Campaign' }),
-    onSuccess: (campaign) => {
-      router.push(`/campaigns/${campaign.id}/edit`);
+    mutationFn: () => api.post<{ data: Campaign }>('/campaigns', { name: 'Untitled Campaign' }),
+    onSuccess: (res) => {
+      router.push(`/campaigns/${res.data.id}/edit`);
     },
     onError: () => {
       toast.error('Failed to create campaign');
