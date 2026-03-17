@@ -43,12 +43,16 @@ async function parseResponse<T>(res: Response, fallbackMsg: string): Promise<T> 
 
 async function apiClient<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {} } = options;
+  const reqHeaders: Record<string, string> = { ...headers };
+  if (body !== undefined) {
+    reqHeaders['Content-Type'] = 'application/json';
+  }
   const config: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: reqHeaders,
     credentials: 'include',
   };
-  if (body) config.body = JSON.stringify(body);
+  if (body !== undefined) config.body = JSON.stringify(body);
 
   const baseUrl = typeof window === 'undefined'
     ? process.env.API_URL || 'http://localhost:3000'
