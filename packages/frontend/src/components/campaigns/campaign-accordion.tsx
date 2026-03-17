@@ -198,7 +198,12 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
   }, []);
 
   const handleBlurSave = useCallback(() => {
-    onSave(formDataRef.current);
+    const { exclude_segment_ids, schedule_type, scheduled_date, scheduled_time,
+      ab_test_variable, ab_test_variants, ab_test_percentage, ab_test_win_criteria,
+      ab_test_auto_send, ab_test_duration, resend_delay, resend_subject_change,
+      resend_different_subject, resend_engaged_only, resend_max,
+      ...apiFields } = formDataRef.current;
+    onSave(apiFields);
   }, [onSave]);
 
   const toggleSection = (idx: number) => {
