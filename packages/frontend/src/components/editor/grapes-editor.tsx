@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Editor } from 'grapesjs';
 import grapesjs from 'grapesjs';
+import 'grapesjs/dist/css/grapes.min.css';
 import mjml from 'grapesjs-mjml';
 import { Monitor, Smartphone, Eye, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
