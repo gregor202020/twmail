@@ -12,9 +12,9 @@ export default function NewTemplatePage() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.post<Template>('/templates', { name: 'Untitled Template' }),
-    onSuccess: (template) => {
-      router.replace(`/templates/${template.id}/edit`);
+      api.post<{ data: Template }>('/templates', { name: 'Untitled Template' }),
+    onSuccess: (res) => {
+      router.replace(`/templates/${res.data.id}/edit`);
     },
     onError: () => {
       toast.error('Failed to create template');
