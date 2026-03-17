@@ -24,8 +24,6 @@ export type Config = z.infer<typeof envSchema>;
 
 let cached: Config | undefined;
 
-export const config: Config = undefined as unknown as Config;
-
 export function getConfig(): Config {
   if (!cached) {
     const result = envSchema.safeParse(process.env);
@@ -37,8 +35,13 @@ export function getConfig(): Config {
       throw new Error(`Invalid environment variables:\n${missing}`);
     }
     cached = result.data;
-    // Mutate the exported config object so direct imports also work
-    Object.assign(config as object, cached);
   }
   return cached;
 }
+
+// Lazy proxy so `config.X` works without calling getConfig() first
+export const config: Config = new Proxy({} as Config, {
+  get(_target, prop: string) {
+    return getConfig()[prop as keyof Config];
+  },
+});
