@@ -103,7 +103,9 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const handleUpdate = useCallback(() => {
-      clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
       debounceRef.current = setTimeout(() => {
         if (!editorRef.current || !onChange) return;
         const result = editorRef.current.runCommand('mjml-code-to-html') as {
@@ -117,7 +119,11 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     }, [onChange]);
 
     useEffect(() => {
-      return () => clearTimeout(debounceRef.current);
+      return () => {
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+        }
+      };
     }, []);
 
     const toggleViewport = useCallback(
