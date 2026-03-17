@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { Editor } from 'grapesjs';
+import type { Editor, Block } from 'grapesjs';
 import grapesjs from 'grapesjs';
 import 'grapesjs/dist/css/grapes.min.css';
 import mjml from 'grapesjs-mjml';
@@ -223,7 +223,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       const blocks = editorRef.current.Blocks.getAll();
       return (
         <div className="grid grid-cols-2 gap-1.5 p-2">
-          {blocks.map((block) => (
+          {blocks.map((block: Block) => (
             <div
               key={block.getId()}
               className="flex flex-col items-center gap-1 p-2 rounded-lg border border-transparent hover:border-blue-300 hover:bg-blue-50 cursor-grab text-center transition-colors"
