@@ -201,9 +201,13 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
     const { exclude_segment_ids, schedule_type, scheduled_date, scheduled_time,
       ab_test_variable, ab_test_variants, ab_test_percentage, ab_test_win_criteria,
       ab_test_auto_send, ab_test_duration, resend_delay, resend_subject_change,
-      resend_different_subject, resend_engaged_only, resend_max,
+      resend_different_subject, resend_engaged_only, resend_max, tags,
       ...apiFields } = formDataRef.current;
-    onSave(apiFields);
+    // Convert tags from comma-separated string to array for the API
+    const tagsArray = typeof tags === 'string'
+      ? tags.split(',').map(t => t.trim()).filter(Boolean)
+      : Array.isArray(tags) ? tags : [];
+    onSave({ ...apiFields, tags: tagsArray });
   }, [onSave]);
 
   const toggleSection = (idx: number) => {
