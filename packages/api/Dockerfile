@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/api/package.json packages/api/
-RUN npm pkg delete scripts.prepare && npm install --workspace=packages/shared --workspace=packages/api
+RUN npm pkg delete scripts.prepare && npm install
 
 COPY tsconfig.base.json ./
 COPY packages/shared/ packages/shared/
@@ -23,7 +23,6 @@ COPY --from=base /app/packages/api/dist ./packages/api/dist/
 COPY --from=base /app/packages/api/package.json ./packages/api/
 COPY --from=base /app/package.json ./
 
-# Ensure workspace resolution works
 RUN mkdir -p node_modules/@twmail && \
     ln -sf /app/packages/shared node_modules/@twmail/shared
 
