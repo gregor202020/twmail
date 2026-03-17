@@ -1,10 +1,13 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 
+# Copy all package.json files so npm can resolve the full workspace
 COPY package.json package-lock.json* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/api/package.json packages/api/
-RUN npm pkg delete scripts.prepare && npm install
+COPY packages/workers/package.json packages/workers/
+COPY packages/frontend/package.json packages/frontend/
+RUN npm pkg delete scripts.prepare && npm install --ignore-scripts
 
 COPY tsconfig.base.json ./
 COPY packages/shared/ packages/shared/
