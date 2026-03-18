@@ -154,10 +154,8 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
           },
         },
         assetManager: {
-          upload: '/api/proxy/assets/upload',
-          uploadName: 'file',
-          credentials: 'include',
-          autoAdd: true,
+          autoAdd: false,
+          upload: 0 as unknown as string, // Disable default upload, we use custom
         },
         deviceManager: {
           devices: [
@@ -200,12 +198,36 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         editor.setComponents(content);
       }
 
-      // Add existing images to asset manager
-      uploadedImages.forEach(img => {
-        editor.AssetManager.add({ src: img.url, name: img.filename });
+      // Load existing images into asset manager from API
+      fetch('/api/proxy/assets?page=1&per_page=100', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.data) {
+            data.data
+              .filter((a: Record<string, unknown>) => typeof a.mime_type === 'string' && (a.mime_type as string).startsWith('image/'))
+              .forEach((a: Record<string, unknown>) => {
+                editor.AssetManager.add({
+                  src: a.url as string,
+                  name: (a.original_name || a.filename) as string,
+                  type: 'image',
+                });
+              });
+          }
+        })
+        .catch(() => {});
+
+      // Custom upload handler for the asset manager dialog
+      editor.on('asset:upload:start', () => { /* noop */ });
+      editor.on('asset:upload:response', (response: string) => {
+        try {
+          const json = JSON.parse(response);
+          if (json.data?.url) {
+            editor.AssetManager.add({ src: json.data.url, name: json.data.original_name || 'image', type: 'image' });
+          }
+        } catch { /* ignore */ }
       });
 
-      // When an mj-image is added with no src, set a placeholder and open asset picker
+      // When an mj-image is added with no src, set a placeholder
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       editor.on('component:add', (component: any) => {
         const type = component.get('type');
@@ -214,13 +236,9 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
           if (!attrs.src || attrs.src === '' || attrs.src === '#') {
             component.set('attributes', {
               ...attrs,
-              src: 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Click+to+select+image',
-              alt: 'Click to select an image',
+              src: 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Double+click+to+set+image',
+              alt: 'Double click to set image',
             });
-            setTimeout(() => {
-              editor.select(component);
-              editor.runCommand('open-assets');
-            }, 300);
           }
         }
       });
