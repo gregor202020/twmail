@@ -14,7 +14,6 @@ import mjml from 'grapesjs-mjml';
 import {
   Monitor, Smartphone, Eye, Undo2, Redo2, Code, Save,
   Layers, Palette, LayoutGrid, Image, PanelLeftClose, PanelLeftOpen,
-  ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -62,7 +61,6 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const [panelOpen, setPanelOpen] = useState(true);
     const [uploadedImages, setUploadedImages] = useState<Array<{ id: number; url: string; filename: string }>>([]);
     const [uploading, setUploading] = useState(false);
-    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
     useImperativeHandle(ref, () => ({
       getHtml: () => {
@@ -261,10 +259,6 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const redo = useCallback(() => editorRef.current?.UndoManager.redo(), []);
     const toggleCode = useCallback(() => { editorRef.current?.runCommand('mjml-code'); }, []);
 
-    const toggleSection = (name: string) => {
-      setCollapsedSections(prev => ({ ...prev, [name]: !prev[name] }));
-    };
-
     // Mount GrapesJS panels to containers
     useEffect(() => {
       if (!ready || !editorRef.current) return;
@@ -371,34 +365,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
               {/* Panel content */}
               <div className="flex-1 overflow-y-auto">
                 {activePanel === 'blocks' && (
-                  <div>
-                    {/* Collapsible sections for blocks */}
-                    {[
-                      { name: 'Layout', desc: 'Sections & columns' },
-                      { name: 'Content', desc: 'Text, images, buttons' },
-                      { name: 'Social', desc: 'Social links & icons' },
-                      { name: 'Navigation', desc: 'Navbars & menus' },
-                    ].map(section => (
-                      <div key={section.name}>
-                        <button
-                          className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                          onClick={() => toggleSection(section.name)}
-                        >
-                          {collapsedSections[section.name]
-                            ? <ChevronRight className="w-3 h-3 text-gray-400" />
-                            : <ChevronDown className="w-3 h-3 text-gray-400" />
-                          }
-                          {section.name}
-                          <span className="text-[9px] text-gray-400 font-normal ml-auto">{section.desc}</span>
-                        </button>
-                        {!collapsedSections[section.name] && (
-                          <div id={`gjs-blocks-${section.name.toLowerCase()}`} className="p-1" />
-                        )}
-                      </div>
-                    ))}
-                    {/* Fallback: full blocks container */}
-                    <div id="gjs-blocks-container" className="p-1" />
-                  </div>
+                  <div id="gjs-blocks-container" className="p-1" />
                 )}
 
                 {activePanel === 'images' && (
