@@ -175,6 +175,10 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
           styles: [
             'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
           ],
+          frameStyle: `
+            body { background-color: #e5e7eb !important; }
+            .gjs-dashed *[data-gjs-highlightable] { outline: 1px dashed rgba(170,170,170,0.3); }
+          `,
         },
         styleManager: {
           sectors: [
@@ -417,7 +421,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
           )}
 
           {/* Canvas */}
-          <div className="flex-1 min-w-0 min-h-0 relative overflow-hidden" ref={containerRef} />
+          <div className="flex-1 min-w-0 min-h-0 relative overflow-hidden bg-gray-100" ref={containerRef} />
         </div>
       </div>
     );
