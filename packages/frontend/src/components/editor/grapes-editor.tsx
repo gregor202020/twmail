@@ -205,20 +205,18 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         editor.AssetManager.add({ src: img.url, name: img.filename });
       });
 
-      // When an mj-image is added with no src, auto-open asset manager
+      // When an mj-image is added with no src, set a placeholder and open asset picker
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       editor.on('component:add', (component: any) => {
         const type = component.get('type');
         if (type === 'mj-image' || type === 'image') {
           const attrs = component.getAttributes();
           if (!attrs.src || attrs.src === '' || attrs.src === '#') {
-            // Give it a placeholder so it's not a broken image
             component.set('attributes', {
               ...attrs,
-              src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjMwMCIgeT0iMTUwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyMCIgZmlsbD0iIzk0YTNiOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9IjdweCI+Q2xpY2sgdG8gc2VsZWN0IGFuIGltYWdlPC90ZXh0Pjwvc3ZnPg==',
+              src: 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Click+to+select+image',
               alt: 'Click to select an image',
             });
-            // Select the component and open asset manager after a short delay
             setTimeout(() => {
               editor.select(component);
               editor.runCommand('open-assets');
