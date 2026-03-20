@@ -12,13 +12,17 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import type { Segment, SegmentRuleGroup, SegmentRule } from '@/types';
 
-function summarizeRules(rules: SegmentRuleGroup[]): string {
-  if (!rules || rules.length === 0) return 'No rules';
-  const count = rules.reduce(
-    (acc, g) => acc + (g.rules as SegmentRule[]).length,
+function summarizeRules(rules: SegmentRuleGroup[] | SegmentRuleGroup | null | undefined): string {
+  if (!rules) return 'No rules';
+  // Handle single group object (API returns { conjunction, rules } not an array)
+  const groups: SegmentRuleGroup[] = Array.isArray(rules) ? rules : [rules];
+  if (groups.length === 0) return 'No rules';
+  const count = groups.reduce(
+    (acc, g) => acc + (Array.isArray(g.rules) ? (g.rules as SegmentRule[]).length : 0),
     0
   );
-  return `${count} rule${count !== 1 ? 's' : ''} in ${rules.length} group${rules.length !== 1 ? 's' : ''}`;
+  if (count === 0) return 'All contacts';
+  return `${count} rule${count !== 1 ? 's' : ''} in ${groups.length} group${groups.length !== 1 ? 's' : ''}`;
 }
 
 export default function SegmentsPage() {

@@ -13,10 +13,16 @@ import 'grapesjs/dist/css/grapes.min.css';
 import mjml from 'grapesjs-mjml';
 import {
   Monitor, Smartphone, Eye, Undo2, Redo2, Code, Save,
-  Layers, Palette, LayoutGrid, Image, PanelLeftClose, PanelLeftOpen,
+  Layers, LayoutGrid, Image, PanelLeftClose, PanelLeftOpen,
+  Link, Type, Square, Columns, Minus, Share2, AlignLeft,
+  Upload, Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 export interface GrapesEditorRef {
   getHtml: () => string;
@@ -30,17 +36,154 @@ interface GrapesEditorProps {
   saving?: boolean;
 }
 
+interface PropField {
+  key: string;
+  label: string;
+  type: 'text' | 'color' | 'select' | 'url';
+  placeholder?: string;
+  options?: { value: string; label: string }[];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GjsComponent = any;
+
+/* ------------------------------------------------------------------ */
+/*  Prop definitions per component type                                */
+/* ------------------------------------------------------------------ */
+
+const ALIGN_OPTIONS = [
+  { value: 'left', label: 'Left' },
+  { value: 'center', label: 'Center' },
+  { value: 'right', label: 'Right' },
+];
+
+const PROP_DEFS: Record<string, PropField[]> = {
+  'mj-image': [
+    { key: 'src', label: 'Image URL', type: 'url', placeholder: 'https://...' },
+    { key: 'href', label: 'Link URL', type: 'url', placeholder: 'https://...' },
+    { key: 'alt', label: 'Alt Text', type: 'text', placeholder: 'Describe image' },
+    { key: 'width', label: 'Width', type: 'text', placeholder: '300px or 100%' },
+    { key: 'align', label: 'Align', type: 'select', options: ALIGN_OPTIONS },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '10px 25px' },
+    { key: 'border-radius', label: 'Roundness', type: 'text', placeholder: '0px' },
+  ],
+  'mj-button': [
+    { key: 'href', label: 'Link URL', type: 'url', placeholder: 'https://...' },
+    { key: 'background-color', label: 'Button Color', type: 'color' },
+    { key: 'color', label: 'Text Color', type: 'color' },
+    { key: 'font-size', label: 'Font Size', type: 'text', placeholder: '16px' },
+    { key: 'font-weight', label: 'Font Weight', type: 'text', placeholder: 'bold' },
+    { key: 'border-radius', label: 'Roundness', type: 'text', placeholder: '6px' },
+    { key: 'inner-padding', label: 'Inner Padding', type: 'text', placeholder: '10px 25px' },
+    { key: 'align', label: 'Align', type: 'select', options: ALIGN_OPTIONS },
+    { key: 'width', label: 'Width', type: 'text', placeholder: 'auto' },
+    { key: 'padding', label: 'Outer Padding', type: 'text', placeholder: '10px 25px' },
+  ],
+  'mj-text': [
+    { key: 'font-size', label: 'Font Size', type: 'text', placeholder: '16px' },
+    { key: 'color', label: 'Text Color', type: 'color' },
+    { key: 'font-weight', label: 'Font Weight', type: 'select', options: [
+      { value: 'normal', label: 'Normal' },
+      { value: 'bold', label: 'Bold' },
+      { value: '300', label: 'Light' },
+      { value: '500', label: 'Medium' },
+      { value: '600', label: 'Semi-Bold' },
+      { value: '800', label: 'Extra Bold' },
+    ]},
+    { key: 'font-family', label: 'Font', type: 'select', options: [
+      { value: 'Arial, sans-serif', label: 'Arial' },
+      { value: 'Helvetica, Arial, sans-serif', label: 'Helvetica' },
+      { value: 'Georgia, serif', label: 'Georgia' },
+      { value: 'Times New Roman, serif', label: 'Times New Roman' },
+      { value: 'Courier New, monospace', label: 'Courier New' },
+      { value: 'Verdana, sans-serif', label: 'Verdana' },
+      { value: 'Trebuchet MS, sans-serif', label: 'Trebuchet MS' },
+      { value: 'Tahoma, sans-serif', label: 'Tahoma' },
+      { value: 'Lucida Sans, sans-serif', label: 'Lucida Sans' },
+      { value: 'Impact, sans-serif', label: 'Impact' },
+    ]},
+    { key: 'line-height', label: 'Line Height', type: 'text', placeholder: '1.6' },
+    { key: 'align', label: 'Align', type: 'select', options: ALIGN_OPTIONS },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '10px 25px' },
+  ],
+  'mj-section': [
+    { key: 'background-color', label: 'Background', type: 'color' },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '20px' },
+    { key: 'border-radius', label: 'Roundness', type: 'text', placeholder: '0px' },
+  ],
+  'mj-column': [
+    { key: 'background-color', label: 'Background', type: 'color' },
+    { key: 'width', label: 'Width', type: 'text', placeholder: '100%' },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '0px' },
+    { key: 'border-radius', label: 'Roundness', type: 'text', placeholder: '0px' },
+  ],
+  'mj-divider': [
+    { key: 'border-color', label: 'Color', type: 'color' },
+    { key: 'border-width', label: 'Thickness', type: 'text', placeholder: '1px' },
+    { key: 'border-style', label: 'Style', type: 'text', placeholder: 'solid' },
+    { key: 'width', label: 'Width', type: 'text', placeholder: '100%' },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '10px 25px' },
+  ],
+  'mj-spacer': [
+    { key: 'height', label: 'Height', type: 'text', placeholder: '20px' },
+  ],
+  'mj-social': [
+    { key: 'mode', label: 'Mode', type: 'text', placeholder: 'horizontal' },
+    { key: 'align', label: 'Align', type: 'select', options: ALIGN_OPTIONS },
+    { key: 'icon-size', label: 'Icon Size', type: 'text', placeholder: '20px' },
+    { key: 'padding', label: 'Padding', type: 'text', placeholder: '10px 25px' },
+  ],
+  'mj-social-element': [
+    { key: 'href', label: 'Link URL', type: 'url', placeholder: 'https://...' },
+    { key: 'name', label: 'Network', type: 'text', placeholder: 'facebook' },
+  ],
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  'mj-body': 'Email Body',
+  'mj-section': 'Section',
+  'mj-column': 'Column',
+  'mj-text': 'Text',
+  'mj-button': 'Button',
+  'mj-image': 'Image',
+  'mj-divider': 'Divider',
+  'mj-social': 'Social Links',
+  'mj-social-element': 'Social Icon',
+  'mj-spacer': 'Spacer',
+  'mj-raw': 'Raw HTML',
+  'mj-navbar': 'Navbar',
+  'mj-navbar-link': 'Nav Link',
+};
+
+const TYPE_ICONS: Record<string, typeof Type> = {
+  'mj-text': Type,
+  'mj-button': Link,
+  'mj-image': Image,
+  'mj-section': Square,
+  'mj-column': Columns,
+  'mj-divider': Minus,
+  'mj-social': Share2,
+  'mj-social-element': Share2,
+  'mj-spacer': AlignLeft,
+  'mj-raw': Code,
+  'mj-video': Play,
+};
+
+/* ------------------------------------------------------------------ */
+/*  Default MJML                                                       */
+/* ------------------------------------------------------------------ */
+
 const DEFAULT_MJML = `<mjml>
-  <mj-body>
-    <mj-section background-color="#ffffff" padding="20px">
+  <mj-body background-color="#f4f4f5">
+    <mj-section background-color="#ffffff" padding="30px 20px">
       <mj-column>
-        <mj-text font-size="24px" font-weight="bold" align="center" color="#333333">
+        <mj-text font-size="28px" font-weight="bold" align="center" color="#1a1a2e" padding="0 0 10px 0">
           Your Email Title
         </mj-text>
-        <mj-text font-size="16px" color="#555555" line-height="1.6">
+        <mj-text font-size="16px" color="#555555" line-height="1.6" padding="0 0 20px 0">
           Start editing this template by clicking on any element. Drag blocks from the left panel to add new content.
         </mj-text>
-        <mj-button background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" href="#">
+        <mj-button background-color="#2563eb" color="#ffffff" font-size="16px" font-weight="bold" border-radius="6px" href="https://example.com" inner-padding="12px 30px">
           Call to Action
         </mj-button>
       </mj-column>
@@ -48,7 +191,87 @@ const DEFAULT_MJML = `<mjml>
   </mj-body>
 </mjml>`;
 
-type PanelTab = 'blocks' | 'styles' | 'layers' | 'images';
+/* ------------------------------------------------------------------ */
+/*  PropertyField component                                            */
+/* ------------------------------------------------------------------ */
+
+const SIZE_KEYS = ['font-size', 'border-radius', 'border-width', 'icon-size', 'height'];
+
+function PropertyFieldInput({
+  field,
+  value,
+  onUpdate,
+}: {
+  field: PropField;
+  value: string;
+  onUpdate: (key: string, value: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+
+  const commit = () => {
+    let v = local;
+    // Auto-append px for size fields if user typed a bare number
+    if (SIZE_KEYS.includes(field.key) && v && /^\d+(\.\d+)?$/.test(v.trim())) {
+      v = v.trim() + 'px';
+      setLocal(v);
+    }
+    if (v !== value) onUpdate(field.key, v);
+  };
+
+  if (field.type === 'color') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="color"
+          value={local || '#000000'}
+          onChange={(e) => { setLocal(e.target.value); onUpdate(field.key, e.target.value); }}
+          className="w-8 h-8 rounded-md border border-[#dde3eb] cursor-pointer p-0.5 shadow-sm"
+        />
+        <input
+          type="text"
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          placeholder={field.placeholder}
+          className="flex-1 h-8 px-2.5 text-xs border border-[#dde3eb] rounded-md bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none shadow-sm text-[#2d3748]"
+        />
+      </div>
+    );
+  }
+
+  if (field.type === 'select' && field.options) {
+    return (
+      <select
+        value={local}
+        onChange={(e) => { setLocal(e.target.value); onUpdate(field.key, e.target.value); }}
+        className="w-full h-8 px-2.5 text-xs border border-[#dde3eb] rounded-md bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none shadow-sm text-[#2d3748]"
+      >
+        <option value="">—</option>
+        {field.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    );
+  }
+
+  return (
+    <input
+      type="text"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      placeholder={field.placeholder}
+      className="w-full h-8 px-2.5 text-xs border border-[#dde3eb] rounded-md bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none shadow-sm text-[#2d3748]"
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main editor component                                              */
+/* ------------------------------------------------------------------ */
+
+type LeftTab = 'blocks' | 'images' | 'layers';
 
 export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
   function GrapesEditor({ initialContent, onChange, onSave, saving }, ref) {
@@ -57,10 +280,18 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
     const [preview, setPreview] = useState(false);
     const [ready, setReady] = useState(false);
-    const [activePanel, setActivePanel] = useState<PanelTab>('blocks');
-    const [panelOpen, setPanelOpen] = useState(true);
+    const [leftTab, setLeftTab] = useState<LeftTab>('blocks');
+    const [leftOpen, setLeftOpen] = useState(true);
     const [uploadedImages, setUploadedImages] = useState<Array<{ id: number; url: string; filename: string }>>([]);
     const [uploading, setUploading] = useState(false);
+
+    // Selected component state for custom properties panel
+    const [selectedType, setSelectedType] = useState('');
+    const [rawHtmlContent, setRawHtmlContent] = useState('');
+    const [isVideoBlock, setIsVideoBlock] = useState(false);
+    const [videoUrl, setVideoUrl] = useState('');
+    const [selectedAttrs, setSelectedAttrs] = useState<Record<string, string>>({});
+    const selectedRef = useRef<GjsComponent>(null);
 
     useImperativeHandle(ref, () => ({
       getHtml: () => {
@@ -78,7 +309,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       },
     }));
 
-    // Load existing images from API
+    // Load uploaded images
     useEffect(() => {
       fetch('/api/proxy/assets?page=1&per_page=100', { credentials: 'include' })
         .then(r => r.ok ? r.json() : null)
@@ -87,55 +318,113 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             setUploadedImages(
               data.data
                 .filter((a: Record<string, unknown>) => typeof a.mime_type === 'string' && (a.mime_type as string).startsWith('image/'))
-                .map((a: Record<string, unknown>) => ({ id: a.id, url: a.url, filename: a.original_name || a.filename }))
+                .map((a: Record<string, unknown>) => ({ id: a.id as number, url: a.url as string, filename: (a.original_name || a.filename) as string }))
             );
           }
         })
         .catch(() => {});
     }, []);
 
-    // Handle image upload
     const handleImageUpload = useCallback(async (files: FileList | null) => {
       if (!files || files.length === 0) return;
       setUploading(true);
-      try {
-        for (const file of Array.from(files)) {
-          if (!file.type.startsWith('image/')) continue;
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch('/api/proxy/assets/upload', {
-            method: 'POST',
-            body: formData,
-            credentials: 'include',
-          });
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const res = await fetch('/api/proxy/assets/upload', { method: 'POST', body: formData, credentials: 'include' });
           if (res.ok) {
             const json = await res.json();
             const asset = json.data;
             const newImg = { id: asset.id, url: asset.url, filename: asset.original_name || asset.filename };
             setUploadedImages(prev => [newImg, ...prev]);
-            // Add to GrapesJS asset manager
-            if (editorRef.current) {
-              editorRef.current.AssetManager.add({ src: asset.url, name: asset.original_name });
-            }
+            editorRef.current?.AssetManager.add({ src: asset.url, name: asset.original_name });
           }
-        }
-      } catch {
-        // ignore
+        } catch { /* ignore */ }
       }
       setUploading(false);
     }, []);
 
-    // Copy image URL to clipboard so user can paste into image src
-    const copyImageUrl = useCallback((url: string) => {
-      navigator.clipboard.writeText(url).catch(() => {});
+    const insertImageIntoEditor = useCallback((url: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const selected = editor.getSelected();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let target: any = selected || editor.getWrapper();
+      try {
+        const pType = target?.get?.('type') as string | undefined;
+        if (pType === 'mj-section') {
+          const cols = target.components?.() as { length?: number; at?: (i: number) => unknown } | undefined;
+          if (cols && typeof cols.length === 'number' && cols.length > 0 && cols.at) target = cols.at(0);
+        } else if (pType !== 'mj-column') {
+          const body = editor.getWrapper()?.components?.()?.at?.(0) as GjsComponent;
+          const sections = body?.components?.() as { length?: number; at?: (i: number) => unknown } | undefined;
+          if (sections && typeof sections.length === 'number' && sections.length > 0 && sections.at) {
+            const last = sections.at(sections.length - 1) as GjsComponent;
+            const cols = last?.components?.() as { length?: number; at?: (i: number) => unknown } | undefined;
+            if (cols && typeof cols.length === 'number' && cols.length > 0 && cols.at) target = cols.at(0);
+            else target = last;
+          }
+        }
+      } catch { /* fallback to target as-is */ }
+      target?.append?.(`<mj-image src="${url}" width="100%" padding="10px 25px" />`);
     }, []);
 
-    // Open the GrapesJS asset manager
-    const openAssetManager = useCallback(() => {
-      if (!editorRef.current) return;
-      editorRef.current.runCommand('open-assets');
+    // Extract YouTube video ID from various URL formats
+    const extractYouTubeId = useCallback((url: string): string | null => {
+      const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+        /^([a-zA-Z0-9_-]{11})$/, // bare ID
+      ];
+      for (const p of patterns) {
+        const m = url.match(p);
+        if (m) return m[1];
+      }
+      return null;
     }, []);
 
+    // Update video URL — auto-sets thumbnail and href on the mj-image
+    const applyVideoUrl = useCallback((url: string) => {
+      setVideoUrl(url);
+      const comp = selectedRef.current;
+      if (!comp) return;
+      const videoId = extractYouTubeId(url);
+      if (!videoId) return;
+      const thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      const href = `https://www.youtube.com/watch?v=${videoId}`;
+      const attrs = comp.getAttributes();
+      comp.set('attributes', { ...attrs, src: thumbnail, href, alt: 'Watch Video' });
+      setSelectedAttrs(prev => ({ ...prev, src: thumbnail, href, alt: 'Watch Video' }));
+    }, [extractYouTubeId]);
+
+    // Update raw HTML content on mj-raw component
+    const updateRawHtml = useCallback((html: string) => {
+      setRawHtmlContent(html);
+      const comp = selectedRef.current;
+      if (!comp) return;
+      try {
+        comp.set('content', html);
+        comp.components(html);
+      } catch { /* fallback */ }
+    }, []);
+
+    // Update attribute on selected component
+    const updateAttr = useCallback((key: string, value: string) => {
+      const comp = selectedRef.current;
+      if (!comp) return;
+      const attrs = comp.getAttributes();
+      if (value) {
+        attrs[key] = value;
+      } else {
+        delete attrs[key];
+      }
+      comp.set('attributes', { ...attrs });
+      // Sync local state
+      setSelectedAttrs(prev => ({ ...prev, [key]: value }));
+    }, []);
+
+    // Initialize GrapesJS
     useEffect(() => {
       if (!containerRef.current || editorRef.current) return;
 
@@ -155,12 +444,18 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         },
         assetManager: {
           autoAdd: false,
-          upload: 0 as unknown as string, // Disable default upload, we use custom
+          upload: '/api/proxy/assets/upload',
+          uploadName: 'file',
+          multiUpload: false,
+          headers: {},
+          credentials: 'include',
+        },
+        richTextEditor: {
+          actions: ['bold', 'italic', 'underline', 'strikethrough', 'link'] as string[],
         },
         deviceManager: {
           devices: [
             { name: 'Desktop', width: '' },
-            { name: 'Tablet', width: '768px' },
             { name: 'Mobile', width: '375px' },
           ],
         },
@@ -169,21 +464,69 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
           ],
           frameStyle: `
-            body { background-color: #e5e7eb !important; }
-            .gjs-dashed *[data-gjs-highlightable] { outline: 1px dashed rgba(170,170,170,0.3); }
+            body { background-color: #f0f0f0 !important; min-height: auto !important; }
           `,
         },
-        styleManager: {
-          sectors: [
-            { name: 'Typography', open: true, properties: ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color', 'line-height', 'text-align', 'text-decoration'] },
-            { name: 'Layout', open: false, properties: ['padding', 'margin', 'width', 'max-width', 'min-height'] },
-            { name: 'Background', open: false, properties: ['background-color', 'background-image'] },
-            { name: 'Border', open: false, properties: ['border-radius', 'border', 'border-width', 'border-color'] },
-          ],
-        },
+        styleManager: { sectors: [] }, // We use our own properties panel
       });
 
       editorRef.current = editor;
+
+      // Add font-size and color buttons to the rich text editor toolbar
+      editor.RichTextEditor.add('fontSize', {
+        icon: '<b style="font-size:13px">A↕</b>',
+        event: 'click',
+        result: (rte: { exec: (cmd: string, val?: string) => void }) => {
+          const val = prompt('Font size (e.g. 14px, 18px, 24px):', '16px');
+          if (val) {
+            rte.exec('fontSize', '7');
+            const sel = (editor.Canvas.getWindow() as Window).getSelection();
+            if (sel && sel.rangeCount > 0) {
+              const node = sel.anchorNode?.parentElement;
+              if (node && node.tagName === 'FONT') {
+                node.removeAttribute('size');
+                node.style.fontSize = val;
+              }
+            }
+          }
+        },
+      });
+      editor.RichTextEditor.add('foreColor', {
+        icon: '<b style="font-size:13px">A<span style="display:block;height:3px;background:red;margin-top:-2px;border-radius:1px"></span></b>',
+        event: 'click',
+        result: (rte: { exec: (cmd: string, val?: string) => void }) => {
+          const val = prompt('Text color (hex or name):', '#333333');
+          if (val) rte.exec('foreColor', val);
+        },
+      });
+
+      // Handle asset upload response from our API
+      editor.on('asset:upload:response', (response: unknown) => {
+        try {
+          const json = typeof response === 'string' ? JSON.parse(response) : response;
+          const asset = (json as Record<string, Record<string, string>>)?.data;
+          if (asset?.url) {
+            editor.AssetManager.add({ src: asset.url, name: asset.original_name || asset.filename, type: 'image' });
+          }
+        } catch { /* ignore parse errors */ }
+      });
+
+      // Replace the broken mj-raw block with a clean one
+      try { editor.Blocks.remove('mj-raw'); } catch { /* may not exist */ }
+      editor.Blocks.add('mj-raw', {
+        label: 'Raw HTML',
+        category: '',
+        media: `<svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>`,
+        content: '<mj-raw><!-- Your custom HTML here --><p style="text-align:center;color:#999;font-size:12px;">Custom HTML Block</p></mj-raw>',
+      });
+
+      // YouTube Video block — uses thumbnail + play overlay, links to video
+      editor.Blocks.add('mj-video', {
+        label: 'Video',
+        category: '',
+        media: `<svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`,
+        content: `<mj-image src="https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" alt="Watch Video" width="100%" padding="10px 25px" border-radius="8px" data-video="true" />`,
+      });
 
       // Load content
       const content = initialContent || DEFAULT_MJML;
@@ -198,7 +541,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         editor.setComponents(content);
       }
 
-      // Load existing images into asset manager from API
+      // Load existing images into asset manager
       fetch('/api/proxy/assets?page=1&per_page=100', { credentials: 'include' })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -206,39 +549,77 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             data.data
               .filter((a: Record<string, unknown>) => typeof a.mime_type === 'string' && (a.mime_type as string).startsWith('image/'))
               .forEach((a: Record<string, unknown>) => {
-                editor.AssetManager.add({
-                  src: a.url as string,
-                  name: (a.original_name || a.filename) as string,
-                  type: 'image',
-                });
+                editor.AssetManager.add({ src: a.url as string, name: (a.original_name || a.filename) as string, type: 'image' });
               });
           }
         })
         .catch(() => {});
 
-      // Custom upload handler for the asset manager dialog
-      editor.on('asset:upload:start', () => { /* noop */ });
-      editor.on('asset:upload:response', (response: string) => {
-        try {
-          const json = JSON.parse(response);
-          if (json.data?.url) {
-            editor.AssetManager.add({ src: json.data.url, name: json.data.original_name || 'image', type: 'image' });
+      // Track selected component for custom properties panel
+      // If user clicks a child inside mj-raw, auto-select the mj-raw parent instead
+      editor.on('component:selected', (component: GjsComponent) => {
+        let comp = component;
+        let type = comp?.get('type') || '';
+        // Walk up to find mj-raw parent
+        if (type !== 'mj-raw') {
+          let parent = comp?.parent?.();
+          while (parent) {
+            if (parent.get('type') === 'mj-raw') {
+              editor.select(parent);
+              return; // the select() call will re-trigger this handler with the mj-raw component
+            }
+            parent = parent.parent?.();
           }
-        } catch { /* ignore */ }
+        }
+        selectedRef.current = comp;
+        const attrs = comp.getAttributes();
+        setSelectedAttrs({ ...attrs });
+        // Detect video blocks (mj-image with data-video attribute)
+        const isVideo = type === 'mj-image' && attrs['data-video'] === 'true';
+        setIsVideoBlock(isVideo);
+        if (isVideo) {
+          setSelectedType('mj-video');
+          // Extract current YouTube URL from href
+          setVideoUrl(attrs.href || '');
+        } else {
+          setSelectedType(type);
+        }
+        // Grab inner HTML for mj-raw
+        if (type === 'mj-raw') {
+          try {
+            const inner = comp.get('content') || comp.getInnerHTML?.() || '';
+            setRawHtmlContent(inner);
+          } catch { setRawHtmlContent(''); }
+        }
+      });
+      editor.on('component:deselected', () => {
+        selectedRef.current = null;
+        setSelectedType('');
+        setSelectedAttrs({});
+        setRawHtmlContent('');
+        setIsVideoBlock(false);
+        setVideoUrl('');
       });
 
-      // When an mj-image is added with no src, set a placeholder
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      editor.on('component:add', (component: any) => {
+      // White background defaults + constrain images
+      editor.on('component:add', (component: GjsComponent) => {
         const type = component.get('type');
-        if (type === 'mj-image' || type === 'image') {
+        if (type === 'mj-section' || type === 'mj-column') {
           const attrs = component.getAttributes();
-          if (!attrs.src || attrs.src === '' || attrs.src === '#') {
-            component.set('attributes', {
-              ...attrs,
-              src: 'https://placehold.co/600x300/e2e8f0/94a3b8?text=Double+click+to+set+image',
-              alt: 'Double click to set image',
-            });
+          if (!attrs['background-color']) {
+            component.set('attributes', { ...attrs, 'background-color': '#ffffff' });
+          }
+        }
+        if (type === 'mj-image') {
+          const attrs = component.getAttributes();
+          if (!attrs.width) {
+            component.set('attributes', { ...attrs, width: '100%' });
+          }
+        }
+        if (type === 'mj-button') {
+          const attrs = component.getAttributes();
+          if (!attrs.href || attrs.href === '#') {
+            component.set('attributes', { ...attrs, href: 'https://' });
           }
         }
       });
@@ -252,7 +633,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-save on changes
+    // Auto-save
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     useEffect(() => {
       if (!ready || !editorRef.current || !onChange) return;
@@ -269,20 +650,17 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       editor.on('component:update', handleUpdate);
       editor.on('component:add', handleUpdate);
       editor.on('component:remove', handleUpdate);
-      editor.on('component:styleUpdate', handleUpdate);
       return () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         editor.off('component:update', handleUpdate);
         editor.off('component:add', handleUpdate);
         editor.off('component:remove', handleUpdate);
-        editor.off('component:styleUpdate', handleUpdate);
       };
     }, [ready, onChange]);
 
     const setDevice = useCallback((mode: 'desktop' | 'mobile') => {
       setViewport(mode);
-      if (!editorRef.current) return;
-      editorRef.current.setDevice(mode === 'mobile' ? 'Mobile' : 'Desktop');
+      editorRef.current?.setDevice(mode === 'mobile' ? 'Mobile' : 'Desktop');
     }, []);
 
     const togglePreview = useCallback(() => {
@@ -296,191 +674,385 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const redo = useCallback(() => editorRef.current?.UndoManager.redo(), []);
     const toggleCode = useCallback(() => { editorRef.current?.runCommand('mjml-code'); }, []);
 
-    // Mount GrapesJS panels to containers
+    // Mount GrapesJS panels
     useEffect(() => {
       if (!ready || !editorRef.current) return;
       const editor = editorRef.current;
-
       const blocksEl = document.getElementById('gjs-blocks-container');
-      if (blocksEl && activePanel === 'blocks' && blocksEl.childElementCount === 0) {
+      if (blocksEl && leftTab === 'blocks' && blocksEl.childElementCount === 0) {
         const v = editor.Blocks.render();
         if (v) blocksEl.appendChild(v);
       }
-      const stylesEl = document.getElementById('gjs-styles-container');
-      if (stylesEl && activePanel === 'styles' && stylesEl.childElementCount === 0) {
-        const v = editor.StyleManager.render();
-        if (v) stylesEl.appendChild(v);
-      }
       const layersEl = document.getElementById('gjs-layers-container');
-      if (layersEl && activePanel === 'layers' && layersEl.childElementCount === 0) {
+      if (layersEl && leftTab === 'layers' && layersEl.childElementCount === 0) {
         const v = editor.Layers.render();
         if (v) layersEl.appendChild(v);
       }
-    }, [ready, activePanel]);
+    }, [ready, leftTab]);
 
-    const panelTabs: { key: PanelTab; label: string; icon: typeof LayoutGrid }[] = [
+    const fields = PROP_DEFS[selectedType] || [];
+    const Icon = TYPE_ICONS[selectedType] || Square;
+
+    const leftTabs: { key: LeftTab; label: string; icon: typeof LayoutGrid }[] = [
       { key: 'blocks', label: 'Blocks', icon: LayoutGrid },
       { key: 'images', label: 'Images', icon: Image },
       { key: 'layers', label: 'Layers', icon: Layers },
-      { key: 'styles', label: 'Styles', icon: Palette },
     ];
 
     return (
-      <div className="flex flex-col h-full overflow-hidden bg-[#1a1a2e]">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between h-10 px-3 bg-[#16213e] border-b border-white/10 shrink-0">
+      <div className="flex flex-col h-full overflow-hidden gjs-custom-theme">
+        {/* GrapesJS theme overrides */}
+        <style>{`
+          /* ── Canvas ── */
+          .gjs-custom-theme .gjs-cv-canvas,
+          .gjs-custom-theme .gjs-frame-wrapper,
+          .gjs-custom-theme .gjs-cv-canvas__frames {
+            background: #c8cdd3 !important;
+          }
+
+          /* ── Block items ── */
+          .gjs-custom-theme .gjs-block {
+            width: calc(50% - 8px) !important;
+            min-height: 76px !important;
+            margin: 4px !important;
+            padding: 12px 6px !important;
+            border: none !important;
+            border-radius: 8px !important;
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+            transition: all 0.2s ease !important;
+            color: #cbd5e0 !important;
+            cursor: grab !important;
+          }
+          .gjs-custom-theme .gjs-block:hover {
+            background: linear-gradient(135deg, #3d4a5c 0%, #2a3441 100%) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+            transform: translateY(-2px);
+          }
+          .gjs-custom-theme .gjs-block:active { cursor: grabbing !important; transform: scale(0.97); }
+          .gjs-custom-theme .gjs-block svg { fill: #90cdf4 !important; }
+          .gjs-custom-theme .gjs-block:hover svg { fill: #63b3ed !important; }
+          .gjs-custom-theme .gjs-block__media { margin-bottom: 6px !important; }
+          .gjs-custom-theme .gjs-block-label {
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.03em !important;
+            color: #a0aec0 !important;
+          }
+          .gjs-custom-theme .gjs-block:hover .gjs-block-label { color: #e2e8f0 !important; }
+          .gjs-custom-theme .gjs-blocks-cs {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            padding: 4px !important;
+          }
+
+          /* ── Layers panel ── */
+          .gjs-custom-theme .gjs-layer { background: transparent !important; font-size: 12px !important; }
+          .gjs-custom-theme .gjs-layer-title {
+            padding: 7px 10px !important;
+            border-radius: 6px !important;
+            background: transparent !important;
+            border: none !important;
+            color: #4a5568 !important;
+          }
+          .gjs-custom-theme .gjs-layer-title:hover { background: #edf2f7 !important; }
+          .gjs-custom-theme .gjs-layer.gjs-selected .gjs-layer-title {
+            background: #ebf4ff !important;
+            color: #2b6cb0 !important;
+          }
+          .gjs-custom-theme .gjs-layer-name { color: #2d3748 !important; font-size: 11px !important; }
+          .gjs-custom-theme .gjs-layers { background: transparent !important; }
+
+          /* ── Canvas highlights ── */
+          .gjs-custom-theme .gjs-selected { outline: 2px solid #4299e1 !important; outline-offset: -1px; }
+          .gjs-custom-theme .gjs-hovered { outline: 2px dashed #90cdf4 !important; }
+
+          /* ── Component toolbar ── */
+          .gjs-custom-theme .gjs-toolbar {
+            background: #2d3748 !important;
+            border-radius: 8px !important;
+            padding: 3px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+          }
+          .gjs-custom-theme .gjs-toolbar-item {
+            padding: 5px 7px !important;
+            color: #e2e8f0 !important;
+            border-radius: 5px !important;
+            font-size: 13px !important;
+          }
+          .gjs-custom-theme .gjs-toolbar-item:hover { background: rgba(255,255,255,0.12) !important; }
+
+          /* ── Component badge ── */
+          .gjs-custom-theme [data-gjs-badge],
+          .gjs-custom-theme .gjs-badge {
+            background: #2b6cb0 !important;
+            color: #fff !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            padding: 2px 8px !important;
+            border-radius: 4px !important;
+          }
+
+          /* ── Rich text editor ── */
+          .gjs-custom-theme .gjs-rte-toolbar {
+            background: #1a202c !important;
+            border-radius: 8px !important;
+            padding: 4px 6px !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+            border: 1px solid rgba(255,255,255,0.06) !important;
+          }
+          .gjs-custom-theme .gjs-rte-action {
+            color: #cbd5e0 !important;
+            border-radius: 4px !important;
+            padding: 5px 8px !important;
+            font-size: 13px !important;
+          }
+          .gjs-custom-theme .gjs-rte-action:hover { background: rgba(255,255,255,0.1) !important; color: #fff !important; }
+          .gjs-custom-theme .gjs-rte-active { background: #4299e1 !important; color: #fff !important; }
+
+          /* ── Misc ── */
+          .gjs-custom-theme .gjs-pn-panel { background: transparent !important; border: none !important; }
+          .gjs-custom-theme .gjs-resizer-h { border-color: #4299e1 !important; }
+          .gjs-custom-theme .gjs-highlighter { outline: 2px dashed #4299e1 !important; }
+        `}</style>
+
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between h-11 px-3 bg-[#1a202c] border-b border-[#2d3748] shrink-0">
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost" size="icon-xs"
-              className="text-white/60 hover:text-white hover:bg-white/10"
-              onClick={() => setPanelOpen(!panelOpen)}
-              title={panelOpen ? 'Collapse panel' : 'Expand panel'}
-            >
-              {panelOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
-            </Button>
-
-            <div className="w-px h-5 bg-white/10 mx-1" />
-
-            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'desktop' && 'text-white bg-white/10')} onClick={() => setDevice('desktop')} title="Desktop">
-              <Monitor className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', viewport === 'mobile' && 'text-white bg-white/10')} onClick={() => setDevice('mobile')} title="Mobile">
-              <Smartphone className="w-3.5 h-3.5" />
-            </Button>
-
-            <div className="w-px h-5 bg-white/10 mx-1" />
-
-            <Button variant="ghost" size="icon-xs" className="text-white/60 hover:text-white hover:bg-white/10" onClick={undo} title="Undo">
-              <Undo2 className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon-xs" className="text-white/60 hover:text-white hover:bg-white/10" onClick={redo} title="Redo">
-              <Redo2 className="w-3.5 h-3.5" />
-            </Button>
-
-            <div className="w-px h-5 bg-white/10 mx-1" />
-
-            <Button variant="ghost" size="icon-xs" className={cn('text-white/60 hover:text-white hover:bg-white/10', preview && 'text-blue-400 bg-white/10')} onClick={togglePreview} title="Preview">
-              <Eye className="w-3.5 h-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon-xs" className="text-white/60 hover:text-white hover:bg-white/10" onClick={toggleCode} title="View Code">
-              <Code className="w-3.5 h-3.5" />
-            </Button>
+            <button onClick={() => setLeftOpen(!leftOpen)} className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors" title={leftOpen ? 'Hide panel' : 'Show panel'}>
+              {leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </button>
+            <div className="w-px h-4 bg-gray-600 mx-1.5" />
+            <button onClick={() => setDevice('desktop')} className={cn('p-1.5 rounded-md transition-colors', viewport === 'desktop' ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:bg-white/10 hover:text-gray-200')} title="Desktop">
+              <Monitor className="w-4 h-4" />
+            </button>
+            <button onClick={() => setDevice('mobile')} className={cn('p-1.5 rounded-md transition-colors', viewport === 'mobile' ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:bg-white/10 hover:text-gray-200')} title="Mobile">
+              <Smartphone className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-gray-600 mx-1.5" />
+            <button onClick={undo} className="p-1.5 rounded-md text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors" title="Undo"><Undo2 className="w-4 h-4" /></button>
+            <button onClick={redo} className="p-1.5 rounded-md text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors" title="Redo"><Redo2 className="w-4 h-4" /></button>
+            <div className="w-px h-4 bg-gray-600 mx-1.5" />
+            <button onClick={togglePreview} className={cn('p-1.5 rounded-md transition-colors', preview ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:bg-white/10 hover:text-gray-200')} title="Preview"><Eye className="w-4 h-4" /></button>
+            <button onClick={toggleCode} className="p-1.5 rounded-md text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors" title="View Code"><Code className="w-4 h-4" /></button>
           </div>
-
-          <div className="flex items-center gap-1.5">
-            {onSave && (
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3" onClick={onSave} disabled={saving}>
-                <Save className="w-3 h-3 mr-1" />
-                {saving ? 'Saving...' : 'Save'}
-              </Button>
-            )}
-          </div>
+          {onSave && (
+            <Button className="bg-blue-500 hover:bg-blue-400 text-white h-8 text-xs px-4 gap-1.5 rounded-md font-semibold shadow-lg shadow-blue-500/20" onClick={onSave} disabled={saving}>
+              <Save className="w-3.5 h-3.5" />{saving ? 'Saving...' : 'Save'}
+            </Button>
+          )}
         </div>
 
-        {/* Main editor area */}
+        {/* ── Main area ── */}
         <div className="flex flex-1 min-h-0">
-          {/* Left panel */}
-          {panelOpen && (
-            <div className="w-[240px] bg-white border-r border-gray-200 flex flex-col shrink-0">
-              {/* Panel tabs */}
-              <div className="flex border-b border-gray-200 shrink-0">
-                {panelTabs.map(tab => (
-                  <button
-                    key={tab.key}
-                    className={cn(
-                      'flex-1 py-2 text-[10px] font-medium transition-colors flex items-center justify-center gap-1',
-                      activePanel === tab.key ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
-                    )}
-                    onClick={() => setActivePanel(tab.key)}
-                  >
-                    <tab.icon className="w-3 h-3" />
-                    {tab.label}
+          {/* ── Left panel ── */}
+          {leftOpen && (
+            <div className="w-[240px] bg-[#1e2533] flex flex-col shrink-0">
+              <div className="flex shrink-0">
+                {leftTabs.map(tab => (
+                  <button key={tab.key} className={cn('flex-1 py-3 text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5', leftTab === tab.key ? 'text-blue-300 border-b-2 border-blue-400 bg-white/5' : 'text-gray-500 hover:text-gray-300 border-b-2 border-transparent')} onClick={() => setLeftTab(tab.key)}>
+                    <tab.icon className="w-3.5 h-3.5" />{tab.label}
                   </button>
                 ))}
               </div>
-
-              {/* Panel content */}
               <div className="flex-1 overflow-y-auto">
-                {activePanel === 'blocks' && (
-                  <div id="gjs-blocks-container" className="p-1" />
-                )}
-
-                {activePanel === 'images' && (
+                {leftTab === 'blocks' && <div id="gjs-blocks-container" className="p-2" />}
+                {leftTab === 'images' && (
                   <div className="p-3 space-y-3">
-                    {/* Instructions */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-[10px] text-blue-700 leading-relaxed">
-                      <strong>How to add images:</strong>
-                      <ol className="list-decimal ml-3 mt-1 space-y-0.5">
-                        <li>Upload images below</li>
-                        <li>Drag an <strong>Image</strong> block from the Blocks tab onto your email</li>
-                        <li>Double-click the image placeholder to pick from your uploads</li>
-                      </ol>
-                    </div>
-
-                    {/* Upload area */}
-                    <label className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
-                      <Image className="w-6 h-6 text-gray-400" />
-                      <span className="text-[11px] text-gray-500 font-medium">
-                        {uploading ? 'Uploading...' : 'Click to upload images'}
-                      </span>
-                      <span className="text-[9px] text-gray-400">PNG, JPG, GIF, WebP up to 25MB</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => handleImageUpload(e.target.files)}
-                        disabled={uploading}
-                      />
+                    <label className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-400/5 transition-colors">
+                      <Upload className="w-6 h-6 text-gray-500" />
+                      <span className="text-xs text-gray-400 font-medium">{uploading ? 'Uploading...' : 'Click to upload images'}</span>
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} disabled={uploading} />
                     </label>
-
-                    {/* Open asset manager button */}
-                    <button
-                      className="w-full py-2 text-[11px] font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                      onClick={openAssetManager}
-                    >
-                      Open Image Picker
-                    </button>
-
-                    {/* Image grid */}
-                    {uploadedImages.length > 0 ? (
-                      <>
-                        <p className="text-[10px] text-gray-500 font-medium">Uploaded Images ({uploadedImages.length})</p>
+                    {uploadedImages.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Your Images</p>
                         <div className="grid grid-cols-2 gap-2">
                           {uploadedImages.map(img => (
-                            <div
+                            <button
                               key={img.id}
-                              className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200"
+                              className="group relative aspect-square rounded-lg overflow-hidden border border-gray-600/50 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer"
+                              onClick={() => insertImageIntoEditor(img.url)}
+                              title={`Click to insert: ${img.filename}`}
                             >
                               <img src={img.url} alt={img.filename} className="w-full h-full object-cover" />
-                              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4">
-                                <p className="text-[9px] text-white truncate">{img.filename}</p>
+                              <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/30 transition-colors flex items-center justify-center">
+                                <span className="text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 bg-blue-500 px-2 py-0.5 rounded">Insert</span>
                               </div>
-                              <button
-                                className="absolute top-1 right-1 bg-white/90 hover:bg-white text-[9px] text-gray-600 px-1.5 py-0.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => copyImageUrl(img.url)}
-                                title="Copy URL"
-                              >
-                                Copy URL
-                              </button>
-                            </div>
+                              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
+                                <p className="text-[9px] text-white/80 truncate">{img.filename}</p>
+                              </div>
+                            </button>
                           ))}
                         </div>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-gray-400 text-center py-4">No images uploaded yet</p>
+                      </div>
                     )}
                   </div>
                 )}
-
-                {activePanel === 'styles' && <div id="gjs-styles-container" className="p-2 text-xs" />}
-                {activePanel === 'layers' && <div id="gjs-layers-container" className="p-2 text-xs" />}
+                {leftTab === 'layers' && <div id="gjs-layers-container" className="p-2 text-xs [&_.gjs-layer-name]:!text-gray-300 [&_.gjs-layer-title]:!text-gray-400 [&_.gjs-layer-title:hover]:!bg-white/5" />}
               </div>
             </div>
           )}
 
-          {/* Canvas */}
+          {/* ── Canvas ── */}
           <div className="flex-1 min-w-0 min-h-0 relative overflow-hidden bg-gray-100" ref={containerRef} />
+
+          {/* ── Right panel ── */}
+          <div className={cn('flex flex-col shrink-0 overflow-hidden', selectedType === 'mj-raw' ? 'w-[400px] bg-[#0d1117]' : 'w-[270px] bg-[#f7f8fa] border-l border-[#e2e6ec]')}>
+            {isVideoBlock ? (
+              <>
+                {/* Video panel */}
+                <div className="px-4 py-3 bg-white border-b border-[#e2e6ec] shrink-0 shadow-sm">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-sm">
+                      <Play className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <span className="text-[13px] font-semibold text-[#1a202c]">YouTube Video</span>
+                      <p className="text-[10px] text-[#718096]">Paste a YouTube link below</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">YouTube URL</label>
+                    <input
+                      type="text"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      onBlur={() => applyVideoUrl(videoUrl)}
+                      onKeyDown={(e) => e.key === 'Enter' && applyVideoUrl(videoUrl)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full h-8 px-2.5 text-xs border border-[#dde3eb] rounded-md bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none shadow-sm text-[#2d3748]"
+                    />
+                  </div>
+                  {/* Thumbnail preview */}
+                  {selectedAttrs.src && selectedAttrs.src.includes('youtube') && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">Preview</label>
+                      <div className="relative rounded-lg overflow-hidden border border-[#dde3eb] shadow-sm">
+                        <img src={selectedAttrs.src} alt="Video thumbnail" className="w-full aspect-video object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-lg">
+                            <Play className="w-5 h-5 text-white ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">Width</label>
+                    <PropertyFieldInput
+                      field={{ key: 'width', label: 'Width', type: 'text', placeholder: '100%' }}
+                      value={selectedAttrs.width || '100%'}
+                      onUpdate={updateAttr}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">Roundness</label>
+                    <PropertyFieldInput
+                      field={{ key: 'border-radius', label: 'Roundness', type: 'text', placeholder: '8px' }}
+                      value={selectedAttrs['border-radius'] || ''}
+                      onUpdate={updateAttr}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">Padding</label>
+                    <PropertyFieldInput
+                      field={{ key: 'padding', label: 'Padding', type: 'text', placeholder: '10px 25px' }}
+                      value={selectedAttrs.padding || ''}
+                      onUpdate={updateAttr}
+                    />
+                  </div>
+                  <div className="pt-2 border-t border-[#e2e6ec]">
+                    <p className="text-[10px] text-[#a0aec0] leading-relaxed">The video thumbnail is shown in the email. When clicked, it opens the YouTube video in the browser.</p>
+                  </div>
+                </div>
+              </>
+            ) : selectedType === 'mj-raw' ? (
+              <>
+                {/* Code editor header */}
+                <div className="px-4 py-3 bg-[#161b22] border-b border-[#30363d] shrink-0 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
+                    <Code className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-[13px] font-semibold text-[#e6edf3]">Raw HTML</span>
+                    <p className="text-[10px] text-[#7d8590]">Edit HTML source code</p>
+                  </div>
+                </div>
+                {/* Line numbers + editor */}
+                <div className="flex-1 overflow-hidden flex">
+                  <div className="w-10 bg-[#0d1117] border-r border-[#21262d] pt-3 shrink-0 select-none overflow-hidden">
+                    {rawHtmlContent.split('\n').map((_, i) => (
+                      <div key={i} className="text-[11px] leading-[20px] text-[#484f58] text-right pr-2 font-mono">{i + 1}</div>
+                    ))}
+                  </div>
+                  <textarea
+                    value={rawHtmlContent}
+                    onChange={(e) => setRawHtmlContent(e.target.value)}
+                    onBlur={() => updateRawHtml(rawHtmlContent)}
+                    className="flex-1 bg-[#0d1117] text-[#e6edf3] font-mono text-[12px] leading-[20px] p-3 resize-none outline-none border-none selection:bg-[#264f78] placeholder:text-[#484f58] overflow-auto"
+                    placeholder="<!-- Enter your HTML here -->&#10;<div style='text-align:center'>&#10;  <p>Your custom content</p>&#10;</div>"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                  />
+                </div>
+                {/* Footer hint */}
+                <div className="px-4 py-2 bg-[#161b22] border-t border-[#30363d] shrink-0 flex items-center justify-between">
+                  <span className="text-[10px] text-[#7d8590]">Changes apply on blur</span>
+                  <button
+                    className="text-[10px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded hover:bg-white/5"
+                    onClick={() => updateRawHtml(rawHtmlContent)}
+                  >
+                    Apply Now
+                  </button>
+                </div>
+              </>
+            ) : selectedType && fields.length > 0 ? (
+              <>
+                {/* Properties header */}
+                <div className="px-4 py-3 bg-white border-b border-[#e2e6ec] shrink-0 shadow-sm">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                      <Icon className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div>
+                      <span className="text-[13px] font-semibold text-[#1a202c]">
+                        {TYPE_LABELS[selectedType] || selectedType}
+                      </span>
+                      <p className="text-[10px] text-[#718096]">Edit properties below</p>
+                    </div>
+                  </div>
+                </div>
+                {/* Fields */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {fields.map(field => (
+                    <div key={field.key}>
+                      <label className="block text-[10px] font-bold text-[#718096] uppercase tracking-wider mb-1.5">
+                        {field.label}
+                      </label>
+                      <PropertyFieldInput
+                        field={field}
+                        value={selectedAttrs[field.key] || ''}
+                        onUpdate={updateAttr}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-[#edf2f7] flex items-center justify-center mb-4">
+                  <Square className="w-7 h-7 text-[#a0aec0]" />
+                </div>
+                <p className="text-sm font-semibold text-[#4a5568]">No element selected</p>
+                <p className="text-xs text-[#a0aec0] mt-1 leading-relaxed">Click any element on the<br />canvas to edit its properties</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

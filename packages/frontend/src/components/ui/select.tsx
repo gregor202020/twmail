@@ -6,13 +6,15 @@ import { cn } from '@/lib/utils';
 
 interface SelectContextValue {
   value: string;
-  onValueChange: (value: string) => void;
+  label: string;
+  onValueChange: (value: string, label: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
 }
 
 const SelectContext = React.createContext<SelectContextValue>({
   value: '',
+  label: '',
   onValueChange: () => {},
   open: false,
   setOpen: () => {},
@@ -27,12 +29,14 @@ interface SelectProps {
 
 function Select({ value: controlledValue, defaultValue = '', onValueChange, children }: SelectProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue);
+  const [internalLabel, setInternalLabel] = React.useState('');
   const [open, setOpen] = React.useState(false);
   const value = controlledValue ?? internalValue;
 
   const handleChange = React.useCallback(
-    (v: string) => {
+    (v: string, lbl: string) => {
       setInternalValue(v);
+      setInternalLabel(lbl);
       onValueChange?.(v);
       setOpen(false);
     },
@@ -53,7 +57,7 @@ function Select({ value: controlledValue, defaultValue = '', onValueChange, chil
   }, [open]);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange: handleChange, open, setOpen }}>
+    <SelectContext.Provider value={{ value, label: internalLabel, onValueChange: handleChange, open, setOpen }}>
       <div className="relative" data-select-root>
         {children}
       </div>
@@ -81,7 +85,7 @@ function SelectTrigger({ className, children, ...props }: React.HTMLAttributes<H
 
 function SelectValue({ placeholder }: { placeholder?: string; className?: string }) {
   const ctx = React.useContext(SelectContext);
-  return <span className="flex flex-1 text-left truncate">{ctx.value || placeholder}</span>;
+  return <span className="flex flex-1 text-left truncate">{ctx.label || ctx.value || placeholder}</span>;
 }
 
 function SelectContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -109,12 +113,25 @@ function SelectItem({
 }: React.HTMLAttributes<HTMLDivElement> & { value: string }) {
   const ctx = React.useContext(SelectContext);
   const isSelected = ctx.value === value;
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Auto-set label when this item's value matches the controlled value on mount
+  React.useEffect(() => {
+    if (isSelected && ref.current) {
+      const text = ref.current.textContent || '';
+      if (text && !ctx.label) {
+        ctx.onValueChange(value, text);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSelected]);
 
   return (
     <div
+      ref={ref}
       role="option"
       aria-selected={isSelected}
-      onClick={() => ctx.onValueChange(value)}
+      onClick={() => ctx.onValueChange(value, ref.current?.textContent || value)}
       className={cn(
         'relative flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-8 pl-2 text-sm select-none hover:bg-accent hover:text-accent-foreground',
         isSelected && 'bg-accent',

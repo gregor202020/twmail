@@ -49,7 +49,7 @@ export default function TemplateEditorPage() {
     mutationFn: (payload: {
       name: string;
       content_html: string;
-      content_json: string;
+      content_json: Record<string, unknown>;
     }) => api.patch(`/templates/${id}`, payload),
     onSuccess: () => {
       setLastSaved(new Date());
@@ -65,7 +65,9 @@ export default function TemplateEditorPage() {
   const handleSave = useCallback(() => {
     if (!editorRef.current) return;
     const content_html = editorRef.current.getHtml();
-    const content_json = editorRef.current.getJson();
+    const jsonStr = editorRef.current.getJson();
+    let content_json: Record<string, unknown> = {};
+    try { content_json = JSON.parse(jsonStr); } catch { /* empty object */ }
     saveMutation.mutate({ name, content_html, content_json });
   }, [name, saveMutation]);
 

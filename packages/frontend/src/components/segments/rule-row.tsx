@@ -13,7 +13,10 @@ const FIELD_OPTIONS = [
   { value: 'last_name', label: 'Last Name' },
   { value: 'phone', label: 'Phone' },
   { value: 'company', label: 'Company' },
-  { value: 'created_at', label: 'Created At' },
+  { value: 'city', label: 'City' },
+  { value: 'country', label: 'Country' },
+  { value: 'source', label: 'Source' },
+  { value: 'created_at', label: 'Date Added' },
   { value: 'status', label: 'Status' },
 ];
 
