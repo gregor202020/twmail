@@ -92,8 +92,8 @@ function getInitialFormData(campaign: Campaign): CampaignFormData {
     preview_text: campaign.preview_text ?? '',
     from_name: campaign.from_name ?? '',
     from_email: campaign.from_email ?? '',
-    segment_id: campaign.segment_id ?? null,
-    list_id: campaign.list_id ?? null,
+    segment_id: campaign.segment_id ? Number(campaign.segment_id) : null,
+    list_id: campaign.list_id ? Number(campaign.list_id) : null,
     exclude_segment_ids: [],
     schedule_type: campaign.scheduled_at ? 'later' : 'now',
     scheduled_date: campaign.scheduled_at
@@ -286,7 +286,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
               <Select
                 value={formData.segment_id?.toString() ?? ''}
                 onValueChange={(val: string | null) => {
-                  const changes = { segment_id: val ? Number(val) : null, list_id: null };
+                  const changes = { segment_id: (val && val !== '__none') ? Number(val) : null, list_id: null };
                   update(changes);
                   onSave(changes);
                 }}
@@ -295,6 +295,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                   <SelectValue placeholder="Select a segment..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none">None</SelectItem>
                   {segments.map((s) => (
                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                   ))}
@@ -307,7 +308,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
               <Select
                 value={formData.list_id?.toString() ?? ''}
                 onValueChange={(val: string | null) => {
-                  const changes = { list_id: val ? Number(val) : null, segment_id: null };
+                  const changes = { list_id: (val && val !== '__none') ? Number(val) : null, segment_id: null };
                   update(changes);
                   onSave(changes);
                 }}
@@ -316,6 +317,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                   <SelectValue placeholder="Select a list..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none">None</SelectItem>
                   {lists.map((l) => (
                     <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
                   ))}
@@ -765,15 +767,26 @@ function DesignSection({ campaign, onSave, isSaving }: DesignSectionProps) {
   const handleTemplateSelect = useCallback(
     (template: { id: number; content_html: string; content_json?: string } | null) => {
       if (template) {
-        // Use JSON if available, otherwise HTML
-        setEditorContent(template.content_json || template.content_html);
+        // Save template content directly to campaign without opening editor
+        const content_html = template.content_html;
+        // content_json may be a string or object — ensure it's an object for the API
+        let content_json: Record<string, unknown> | undefined;
+        if (template.content_json) {
+          if (typeof template.content_json === 'string') {
+            try { content_json = JSON.parse(template.content_json); } catch { content_json = undefined; }
+          } else {
+            content_json = template.content_json as unknown as Record<string, unknown>;
+          }
+        }
+        onSave({ content_html, content_json, template_id: template.id } as unknown as Partial<CampaignFormData>);
+        toast.success('Template applied');
       } else {
-        // Blank
+        // Blank — open editor
         setEditorContent(undefined);
+        setShowEditor(true);
       }
-      setShowEditor(true);
     },
-    []
+    [onSave]
   );
 
   const handleEditDesign = useCallback(() => {

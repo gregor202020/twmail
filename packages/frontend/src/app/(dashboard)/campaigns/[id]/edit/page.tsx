@@ -25,10 +25,12 @@ export default function EditCampaignPage({ params }: { params: Promise<{ id: str
 
   const saveMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
-      api.patch<Campaign>(`/campaigns/${campaignId}`, data),
-    onSuccess: (updated) => {
+      api.patch<{ data: Campaign }>(`/campaigns/${campaignId}`, data),
+    onSuccess: (res) => {
+      const updated = (res as { data: Campaign }).data ?? res;
       queryClient.setQueryData(queryKeys.campaigns.detail(campaignId), updated);
       queryClient.invalidateQueries({ queryKey: queryKeys.campaigns.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.campaigns.detail(campaignId) });
     },
     onError: () => {
       toast.error('Failed to save campaign');

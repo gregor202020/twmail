@@ -12,11 +12,11 @@ const createSchema = z.object({
   from_name: z.string().max(255).optional(),
   from_email: z.union([z.string().email(), z.literal('')]).optional(),
   reply_to: z.union([z.string().email(), z.literal('')]).optional(),
-  template_id: z.number().optional().nullable(),
+  template_id: z.preprocess(v => v == null ? null : Number(v), z.number().nullable()).optional(),
   content_html: z.string().optional(),
   content_json: z.record(z.unknown()).optional().nullable(),
-  segment_id: z.number().optional().nullable(),
-  list_id: z.number().optional().nullable(),
+  segment_id: z.preprocess(v => v == null ? null : Number(v), z.number().nullable()).optional(),
+  list_id: z.preprocess(v => v == null ? null : Number(v), z.number().nullable()).optional(),
   ab_test_enabled: z.boolean().optional(),
   ab_test_config: z.record(z.unknown()).optional().nullable(),
   resend_enabled: z.boolean().optional(),
@@ -209,10 +209,27 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only update draft campaigns');
     }
 
-    // Coerce null to undefined for NOT NULL columns so Kysely skips them
+    // Nullable columns that can be set to NULL
+    const NULLABLE_COLUMNS = new Set([
+      'segment_id', 'list_id', 'template_id', 'scheduled_at', 'send_started_at',
+      'send_completed_at', 'ab_test_config', 'resend_config', 'resend_of', 'content_json',
+    ]);
+
+    // Coerce null to undefined for NOT NULL columns so Kysely skips them,
+    // but preserve null for nullable columns
     const updateData: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {
-      updateData[key] = value === null ? undefined : value;
+      if (value === null && !NULLABLE_COLUMNS.has(key)) {
+        updateData[key] = undefined;
+      } else {
+        updateData[key] = value;
+      }
+    }
+
+    // Skip update if nothing to change
+    const hasChanges = Object.values(updateData).some(v => v !== undefined);
+    if (!hasChanges) {
+      return reply.send({ data: campaign });
     }
 
     const result = await db
