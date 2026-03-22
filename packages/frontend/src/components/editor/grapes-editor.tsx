@@ -517,7 +517,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         label: 'Raw HTML',
         category: '',
         media: `<svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>`,
-        content: '<mj-raw><!-- Your custom HTML here --><p style="text-align:center;color:#999;font-size:12px;">Custom HTML Block</p></mj-raw>',
+        content: '<mj-section background-color="#ffffff" padding="0"><mj-column><mj-raw><!-- Your custom HTML here --><p style="text-align:center;color:#999;font-size:12px;">Custom HTML Block</p></mj-raw></mj-column></mj-section>',
       });
 
       // YouTube Video block — uses thumbnail + play overlay, links to video

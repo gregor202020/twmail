@@ -78,7 +78,7 @@ export function Sidebar() {
             <DropdownMenuTrigger className="w-7 h-7 bg-white/10 rounded-full flex items-center justify-center text-[11px] text-white/60 font-semibold hover:bg-white/20 transition-colors">
               G
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuContent align="start" className="w-40 bottom-0 left-full ml-2 mb-0 mt-auto">
               <Link href="/settings">
                 <DropdownMenuItem>
                   Profile
