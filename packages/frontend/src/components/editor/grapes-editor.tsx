@@ -18,6 +18,13 @@ import {
   Upload, Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
@@ -292,6 +299,8 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const [videoUrl, setVideoUrl] = useState('');
     const [selectedAttrs, setSelectedAttrs] = useState<Record<string, string>>({});
     const selectedRef = useRef<GjsComponent>(null);
+    const [htmlEditorOpen, setHtmlEditorOpen] = useState(false);
+    const [htmlEditorCode, setHtmlEditorCode] = useState('');
 
     useImperativeHandle(ref, () => ({
       getHtml: () => {
@@ -408,6 +417,25 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         comp.components(html);
       } catch { /* fallback */ }
     }, []);
+
+    const openHtmlEditor = useCallback(() => {
+      const comp = selectedRef.current;
+      if (!comp) return;
+      setHtmlEditorCode(comp.toHTML());
+      setHtmlEditorOpen(true);
+    }, []);
+
+    const applyHtmlEditor = useCallback(() => {
+      const comp = selectedRef.current;
+      if (!comp) return;
+      const parent = comp.parent();
+      if (!parent) return;
+      const index = parent.components().indexOf(comp);
+      comp.remove();
+      parent.components().add(htmlEditorCode, { at: index });
+      setHtmlEditorOpen(false);
+      setHtmlEditorCode('');
+    }, [htmlEditorCode]);
 
     // Update attribute on selected component
     const updateAttr = useCallback((key: string, value: string) => {
@@ -1041,6 +1069,15 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
                       />
                     </div>
                   ))}
+                  <div className="pt-2 border-t border-[#e2e6ec]">
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-medium text-[#4a5568] bg-[#edf2f7] hover:bg-[#e2e8f0] rounded-lg transition-colors"
+                      onClick={openHtmlEditor}
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      Edit Component HTML
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -1054,6 +1091,29 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             )}
           </div>
         </div>
+
+        {/* Per-component HTML editor dialog */}
+        <Dialog open={htmlEditorOpen} onOpenChange={setHtmlEditorOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Edit Component HTML</DialogTitle>
+            </DialogHeader>
+            <textarea
+              className="flex-1 min-h-[300px] w-full rounded-md border border-[#e2e6ec] bg-[#0d1117] text-[#e6edf3] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={htmlEditorCode}
+              onChange={(e) => setHtmlEditorCode(e.target.value)}
+              spellCheck={false}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setHtmlEditorOpen(false)}>
+                Cancel
+              </Button>
+              <Button className="bg-tw-blue hover:bg-tw-blue-dark" onClick={applyHtmlEditor}>
+                Apply
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   },
