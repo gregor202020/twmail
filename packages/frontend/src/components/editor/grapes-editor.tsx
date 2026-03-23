@@ -685,17 +685,20 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         .catch(() => {});
 
       // Track selected component for custom properties panel
-      // If user clicks a child inside mj-raw, auto-select the mj-raw parent instead
+      // If user clicks a non-editable child inside mj-raw, auto-select the mj-raw parent
+      // But if the child is editable (text, p, td, etc.), let the user edit it directly
       editor.on('component:selected', (component: GjsComponent) => {
         let comp = component;
         let type = comp?.get('type') || '';
-        // Walk up to find mj-raw parent
-        if (type !== 'mj-raw') {
+        const tagName = (comp?.get('tagName') || '').toLowerCase();
+        const isEditable = comp?.get('editable') || EDITABLE_TAG_NAMES.has(tagName) || EDITABLE_HTML_TYPES.has(type);
+        // Walk up to find mj-raw parent only for non-editable children
+        if (type !== 'mj-raw' && !isEditable) {
           let parent = comp?.parent?.();
           while (parent) {
             if (parent.get('type') === 'mj-raw') {
               editor.select(parent);
-              return; // the select() call will re-trigger this handler with the mj-raw component
+              return;
             }
             parent = parent.parent?.();
           }
