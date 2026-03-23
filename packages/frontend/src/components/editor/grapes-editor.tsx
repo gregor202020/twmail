@@ -537,7 +537,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
     const TEXT_TAGS = new Set([
       'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div',
       'td', 'th', 'li', 'blockquote', 'pre', 'label',
-      'b', 'i', 'em', 'strong', 'u', 'a',
+      'b', 'i', 'em', 'strong', 'u',
     ]);
 
     // Recursively make imported HTML components editable
@@ -545,13 +545,13 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       if (!comp) return;
       const type = comp.get('type') || '';
       const tagName = (comp.get('tagName') || '').toLowerCase();
-      // Convert text-containing elements to GrapesJS 'text' type for inline RTE
-      if (!type.startsWith('mj-') && (type === 'default' || type === 'text' || type === '') && TEXT_TAGS.has(tagName)) {
-        comp.set({ type: 'text', editable: true });
+      // Links (<a> tags) should keep their link type, not be converted to text
+      if (tagName === 'a' || type === 'link') {
+        comp.set({ type: 'link', editable: true, droppable: true });
       }
-      // Links should keep link type but be editable
-      if (type === 'link') {
-        comp.set('editable', true);
+      // Convert other text-containing elements to GrapesJS 'text' type for inline RTE
+      else if (!type.startsWith('mj-') && (type === 'default' || type === 'text' || type === '') && TEXT_TAGS.has(tagName)) {
+        comp.set({ type: 'text', editable: true });
       }
       // Recurse into children
       const children = comp.components?.();
@@ -607,6 +607,39 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
       });
 
       editorRef.current = editor;
+
+      // Prevent GrapesJS from stripping/collapsing <a> tags with mailto: and tel: protocols
+      const dc = editor.DomComponents;
+      const defaultLinkType = dc.getType('link');
+      const defaultLinkModel = defaultLinkType!.model;
+      dc.addType('link', {
+        model: {
+          defaults: {
+            ...defaultLinkModel.prototype.defaults,
+            // Keep all attributes including mailto/tel hrefs
+            droppable: true,
+            editable: true,
+          },
+          // Override isComponent to catch all <a> tags and preserve them
+        },
+        isComponent: (el: HTMLElement) => {
+          if (el.tagName === 'A') {
+            return { type: 'link' };
+          }
+          return false;
+        },
+      });
+
+      // Also prevent empty-looking elements from being stripped during parse
+      // by hooking into the parser to preserve text nodes inside links
+      editor.on('parse:html', (result: { html: string }) => {
+        // Preserve mailto and tel links that GrapesJS might strip
+        if (result.html) {
+          result.html = result.html
+            .replace(/<a\s+([^>]*href="mailto:[^"]*"[^>]*)\/>/gi, '<a $1></a>')
+            .replace(/<a\s+([^>]*href="tel:[^"]*"[^>]*)\/>/gi, '<a $1></a>');
+        }
+      });
 
       // Add font-size and color buttons to the rich text editor toolbar
       editor.RichTextEditor.add('fontSize', {
