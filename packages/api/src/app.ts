@@ -86,6 +86,24 @@ export async function buildApp() {
   await app.register(authPlugin);
   await app.register(rateLimitPlugin);
 
+  // Accept text/plain from SNS (sends JSON with text/plain; charset=UTF-8)
+  app.addContentTypeParser('text/plain', { parseAs: 'buffer' }, (_req, body, done) => {
+    try {
+      done(null, JSON.parse((body as Buffer).toString('utf-8')));
+    } catch {
+      done(null, (body as Buffer).toString('utf-8'));
+    }
+  });
+
+  // Catch-all for other content types (e.g. form-urlencoded from misc sources)
+  app.addContentTypeParser('*', { parseAs: 'buffer' }, (_req, body, done) => {
+    try {
+      done(null, JSON.parse((body as Buffer).toString('utf-8')));
+    } catch {
+      done(null, body);
+    }
+  });
+
   // Routes
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api/auth' });

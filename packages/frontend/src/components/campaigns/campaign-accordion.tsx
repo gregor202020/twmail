@@ -72,6 +72,8 @@ interface CampaignFormData {
   utm_content: string;
   ga_tracking: boolean;
   tracking_domain: string;
+  open_tracking: boolean;
+  click_tracking: boolean;
   send_time_optimization: boolean;
 }
 
@@ -128,6 +130,8 @@ function getInitialFormData(campaign: Campaign): CampaignFormData {
     utm_content: campaign.utm_content ?? '',
     ga_tracking: campaign.ga_tracking ?? false,
     tracking_domain: campaign.tracking_domain ?? '',
+    open_tracking: campaign.open_tracking ?? true,
+    click_tracking: campaign.click_tracking ?? true,
     send_time_optimization: campaign.send_time_optimization ?? false,
   };
 }
@@ -284,9 +288,11 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
             <div>
               <Label className="text-xs text-text-muted mb-1">Send to Segment</Label>
               <Select
-                value={formData.segment_id?.toString() ?? ''}
+                value={formData.segment_id?.toString() ?? 'none'}
                 onValueChange={(val: string | null) => {
-                  const changes = { segment_id: val ? Number(val) : null, list_id: null };
+                  const changes = val && val !== 'none'
+                    ? { segment_id: Number(val), list_id: null }
+                    : { segment_id: null };
                   update(changes);
                   onSave(changes);
                 }}
@@ -295,6 +301,7 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                   <SelectValue placeholder="Select a segment..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No segment</SelectItem>
                   {segments.map((s) => (
                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                   ))}
@@ -458,6 +465,26 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs">Open Tracking</Label>
+                <p className="text-[11px] text-text-muted">Track when recipients open the email. Disable to improve inbox placement.</p>
+              </div>
+              <Switch
+                checked={formData.open_tracking}
+                onCheckedChange={(checked) => { update({ open_tracking: !!checked }); onSave({ open_tracking: !!checked }); }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs">Click Tracking</Label>
+                <p className="text-[11px] text-text-muted">Track link clicks. Disable to keep original URLs and improve inbox placement.</p>
+              </div>
+              <Switch
+                checked={formData.click_tracking}
+                onCheckedChange={(checked) => { update({ click_tracking: !!checked }); onSave({ click_tracking: !!checked }); }}
+              />
+            </div>
             <div className="flex items-center justify-between">
               <Label className="text-xs">Google Analytics Tracking</Label>
               <Switch

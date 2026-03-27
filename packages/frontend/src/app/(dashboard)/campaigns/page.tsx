@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Plus, MoreHorizontal, Pencil, Copy, Pause, XCircle, Trash2 } from 'lucide-react';
+import { Send, Plus, MoreHorizontal, Pencil, Copy, Pause, XCircle, Trash2, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api-client';
@@ -104,14 +104,17 @@ export default function CampaignsPage() {
     {
       key: 'name',
       header: 'Name',
-      render: (c) => (
-        <Link
-          href={`/campaigns/${c.id}/edit`}
-          className="text-xs font-medium text-text-primary hover:text-tw-blue transition-colors"
-        >
-          {c.name}
-        </Link>
-      ),
+      render: (c) => {
+        const isSent = c.status === CampaignStatus.SENT || c.status === CampaignStatus.SENDING;
+        return (
+          <Link
+            href={isSent ? `/campaigns/${c.id}/report` : `/campaigns/${c.id}/edit`}
+            className="text-xs font-medium text-text-primary hover:text-tw-blue transition-colors"
+          >
+            {c.name}
+          </Link>
+        );
+      },
     },
     {
       key: 'status',
@@ -164,6 +167,12 @@ export default function CampaignsPage() {
             <MoreHorizontal className="w-4 h-4 text-text-muted" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {(c.status === CampaignStatus.SENT || c.status === CampaignStatus.SENDING) && (
+              <DropdownMenuItem onClick={() => router.push(`/campaigns/${c.id}/report`)}>
+                <BarChart3 className="w-3.5 h-3.5" />
+                View Report
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => router.push(`/campaigns/${c.id}/edit`)}>
               <Pencil className="w-3.5 h-3.5" />
               Edit

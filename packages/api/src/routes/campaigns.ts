@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { getDb, getRedis, ErrorCode, CampaignStatus } from '@twmail/shared';
+import { sql } from 'kysely';
+import { getDb, getRedis, ErrorCode, CampaignStatus, EventType } from '@twmail/shared';
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError } from '../plugins/error-handler.js';
@@ -12,11 +13,11 @@ const createSchema = z.object({
   from_name: z.string().max(255).optional(),
   from_email: z.union([z.string().email(), z.literal('')]).optional(),
   reply_to: z.union([z.string().email(), z.literal('')]).optional(),
-  template_id: z.number().optional().nullable(),
+  template_id: z.union([z.number(), z.string().transform(v => { const n = Number(v); return isNaN(n) ? null : n; })]).optional().nullable(),
   content_html: z.string().optional(),
-  content_json: z.record(z.unknown()).optional().nullable(),
-  segment_id: z.number().optional().nullable(),
-  list_id: z.number().optional().nullable(),
+  content_json: z.union([z.record(z.unknown()), z.string().transform((s) => { try { return JSON.parse(s); } catch { return s; } })]).optional().nullable(),
+  segment_id: z.union([z.number(), z.string().transform(v => { const n = Number(v); return isNaN(n) ? null : n; })]).optional().nullable(),
+  list_id: z.union([z.number(), z.string().transform(v => { const n = Number(v); return isNaN(n) ? null : n; })]).optional().nullable(),
   ab_test_enabled: z.boolean().optional(),
   ab_test_config: z.record(z.unknown()).optional().nullable(),
   resend_enabled: z.boolean().optional(),
@@ -30,6 +31,8 @@ const createSchema = z.object({
   ga_tracking: z.boolean().optional(),
   tracking_domain: z.string().max(255).optional(),
   send_time_optimization: z.boolean().optional(),
+  open_tracking: z.boolean().optional(),
+  click_tracking: z.boolean().optional(),
 });
 
 const updateSchema = createSchema.partial().strip();
@@ -191,7 +194,12 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const body = updateSchema.parse(stripped);
+    const parseResult = updateSchema.safeParse(stripped);
+    if (!parseResult.success) {
+      request.log.error({ stripped, errors: parseResult.error.issues }, 'Campaign update validation failed');
+      throw new AppError(400, ErrorCode.VALIDATION_ERROR, parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', '));
+    }
+    const body = parseResult.data;
     const db = getDb();
     const id = Number(request.params.id);
 
@@ -209,18 +217,25 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only update draft campaigns');
     }
 
-    // Coerce null to undefined for NOT NULL columns so Kysely skips them
+    // Keep null for nullable columns, skip undefined
+    const NULLABLE_COLUMNS = new Set(['template_id', 'segment_id', 'list_id', 'content_json', 'ab_test_config', 'resend_config']);
     const updateData: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(body)) {
-      updateData[key] = value === null ? undefined : value;
+      if (value === null && !NULLABLE_COLUMNS.has(key)) continue;
+      if (value !== undefined) updateData[key] = value;
     }
 
-    const result = await db
-      .updateTable('campaigns')
-      .set(updateData)
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
+    let result;
+    if (Object.keys(updateData).length > 0) {
+      result = await db
+        .updateTable('campaigns')
+        .set(updateData)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst();
+    } else {
+      result = campaign;
+    }
 
     if (!result) {
       throw new AppError(404, ErrorCode.NOT_FOUND, 'Campaign not found');
@@ -244,10 +259,12 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       throw new AppError(404, ErrorCode.NOT_FOUND, 'Campaign not found');
     }
 
-    if (campaign.status !== CampaignStatus.DRAFT) {
-      throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only delete draft campaigns');
-    }
-
+    // Delete related records first, then the campaign
+    await db.deleteFrom('messages').where('campaign_id', '=', id).execute();
+    await db.deleteFrom('campaign_variants').where('campaign_id', '=', id).execute();
+    await db.deleteFrom('campaign_holdback_contacts').where('campaign_id', '=', id).execute();
+    await db.updateTable('assets').set({ campaign_id: null }).where('campaign_id', '=', id).execute();
+    await db.updateTable('campaigns').set({ resend_of: null }).where('resend_of', '=', id).execute();
     await db.deleteFrom('campaigns').where('id', '=', id).executeTakeFirst();
 
     return reply.status(204).send();
@@ -488,30 +505,105 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       .orderBy('created_at', 'asc')
       .execute();
 
-    const delivered = campaign.total_delivered || 1;
+    // Unique opens/clicks from messages table
+    const uniqueCounts = await db
+      .selectFrom('messages')
+      .select([
+        sql<number>`count(*) filter (where first_open_at is not null)`.as('unique_opens'),
+        sql<number>`count(*) filter (where first_click_at is not null)`.as('unique_clicks'),
+      ])
+      .where('campaign_id', '=', id)
+      .executeTakeFirst();
+
+    const nSent = Number(campaign.total_sent) || 1;
+    const nOpens = Number(campaign.total_human_opens);
+    const nClicks = Number(campaign.total_human_clicks);
+    const nBounces = Number(campaign.total_bounces);
+    const nComplaints = Number(campaign.total_complaints);
+    const nUnsubs = Number(campaign.total_unsubscribes);
+    const nUniqueOpens = Number(uniqueCounts?.unique_opens ?? 0);
+    const nUniqueClicks = Number(uniqueCounts?.unique_clicks ?? 0);
     const stats = {
-      total_sent: campaign.total_sent,
-      total_delivered: campaign.total_delivered,
-      delivery_rate: Number(((campaign.total_delivered / (campaign.total_sent || 1)) * 100).toFixed(2)),
-      total_opens: campaign.total_opens,
-      total_human_opens: campaign.total_human_opens,
-      open_rate: Number(((campaign.total_human_opens / delivered) * 100).toFixed(2)),
-      total_clicks: campaign.total_clicks,
-      total_human_clicks: campaign.total_human_clicks,
-      click_rate: Number(((campaign.total_human_clicks / delivered) * 100).toFixed(2)),
-      click_to_open_rate:
-        campaign.total_human_opens > 0
-          ? Number(((campaign.total_human_clicks / campaign.total_human_opens) * 100).toFixed(2))
-          : 0,
-      total_bounces: campaign.total_bounces,
-      bounce_rate: Number(((campaign.total_bounces / (campaign.total_sent || 1)) * 100).toFixed(2)),
-      total_complaints: campaign.total_complaints,
-      complaint_rate: Number(((campaign.total_complaints / delivered) * 100).toFixed(4)),
-      total_unsubscribes: campaign.total_unsubscribes,
-      unsubscribe_rate: Number(((campaign.total_unsubscribes / delivered) * 100).toFixed(2)),
+      total_sent: Number(campaign.total_sent),
+      total_delivered: Number(campaign.total_delivered),
+      delivery_rate: Number(((Number(campaign.total_delivered) / nSent) * 100).toFixed(1)),
+      total_opens: Number(campaign.total_opens),
+      total_human_opens: nOpens,
+      unique_opens: nUniqueOpens,
+      open_rate: Number(((nOpens / nSent) * 100).toFixed(1)),
+      unique_open_rate: Number(((nUniqueOpens / nSent) * 100).toFixed(1)),
+      total_clicks: Number(campaign.total_clicks),
+      total_human_clicks: nClicks,
+      unique_clicks: nUniqueClicks,
+      click_rate: Number(((nClicks / nSent) * 100).toFixed(1)),
+      unique_click_rate: Number(((nUniqueClicks / nSent) * 100).toFixed(1)),
+      click_to_open_rate: nOpens > 0 ? Number(((nClicks / nOpens) * 100).toFixed(1)) : 0,
+      total_bounces: nBounces,
+      bounce_rate: Number(((nBounces / nSent) * 100).toFixed(1)),
+      total_complaints: nComplaints,
+      complaint_rate: Number(((nComplaints / nSent) * 100).toFixed(2)),
+      total_unsubscribes: nUnsubs,
+      unsubscribe_rate: Number(((nUnsubs / nSent) * 100).toFixed(1)),
     };
 
-    return reply.send({ data: { campaign, variants, stats } });
+    // Timeline: opens and clicks by date
+    const timelineRows = await db
+      .selectFrom('events')
+      .select([
+        sql<string>`date(event_time)`.as('date'),
+        sql<number>`count(*) filter (where event_type in (${sql.lit(EventType.OPEN)}, ${sql.lit(EventType.MACHINE_OPEN)}))`.as('opens'),
+        sql<number>`count(*) filter (where event_type = ${sql.lit(EventType.CLICK)})`.as('clicks'),
+      ])
+      .where('campaign_id', '=', id)
+      .where('event_type', 'in', [EventType.OPEN, EventType.MACHINE_OPEN, EventType.CLICK])
+      .groupBy(sql`date(event_time)`)
+      .orderBy('date', 'asc')
+      .execute();
+
+    const timeline = timelineRows.map(r => ({
+      date: String(r.date),
+      opens: Number(r.opens),
+      clicks: Number(r.clicks),
+    }));
+
+    // Bounces
+    const bounceRows = await db
+      .selectFrom('events')
+      .innerJoin('contacts', 'contacts.id', 'events.contact_id')
+      .select([
+        'contacts.email',
+        'events.event_type as type',
+        sql<string>`events.metadata->>'reason'`.as('reason'),
+        'events.event_time as date',
+      ])
+      .where('events.campaign_id', '=', id)
+      .where('events.event_type', 'in', [EventType.HARD_BOUNCE, EventType.SOFT_BOUNCE])
+      .orderBy('events.event_time', 'desc')
+      .execute();
+
+    const bounces = bounceRows.map(r => ({
+      email: r.email,
+      type: String(r.type),
+      reason: r.reason || '',
+      date: String(r.date),
+    }));
+
+    // Complaints
+    const complaintRows = await db
+      .selectFrom('events')
+      .innerJoin('contacts', 'contacts.id', 'events.contact_id')
+      .select(['contacts.email', 'events.event_time as date'])
+      .where('events.campaign_id', '=', id)
+      .where('events.event_type', '=', EventType.COMPLAINT)
+      .orderBy('events.event_time', 'desc')
+      .execute();
+
+    const complaints = complaintRows.map(r => ({
+      email: r.email,
+      date: String(r.date),
+    }));
+
+    return reply.send({ data: { campaign, variants, stats, timeline, bounces, complaints } });
   });
 
   // GET /api/campaigns/:id/recipients

@@ -58,21 +58,21 @@ export const reportRoutes: FastifyPluginAsync = async (app) => {
     let avgBounceRate = 0;
 
     if (sentCampaigns.length > 0) {
-      const totalDelivered = sentCampaigns.reduce((sum, c) => sum + c.total_delivered, 0);
-      const totalHumanOpens = sentCampaigns.reduce((sum, c) => sum + c.total_human_opens, 0);
-      const totalHumanClicks = sentCampaigns.reduce((sum, c) => sum + c.total_human_clicks, 0);
-      const totalBounces = sentCampaigns.reduce((sum, c) => sum + c.total_bounces, 0);
-      const totalSent = sentCampaigns.reduce((sum, c) => sum + c.total_sent, 0);
+      const totalHumanOpens = sentCampaigns.reduce((sum, c) => sum + Number(c.total_human_opens), 0);
+      const totalHumanClicks = sentCampaigns.reduce((sum, c) => sum + Number(c.total_human_clicks), 0);
+      const totalBounces = sentCampaigns.reduce((sum, c) => sum + Number(c.total_bounces), 0);
+      const totalSent = sentCampaigns.reduce((sum, c) => sum + Number(c.total_sent), 0);
 
-      avgOpenRate = totalDelivered > 0 ? Number(((totalHumanOpens / totalDelivered) * 100).toFixed(2)) : 0;
-      avgClickRate = totalDelivered > 0 ? Number(((totalHumanClicks / totalDelivered) * 100).toFixed(2)) : 0;
-      avgBounceRate = totalSent > 0 ? Number(((totalBounces / totalSent) * 100).toFixed(2)) : 0;
+      avgOpenRate = totalSent > 0 ? Number(((totalHumanOpens / totalSent) * 100).toFixed(1)) : 0;
+      avgClickRate = totalSent > 0 ? Number(((totalHumanClicks / totalSent) * 100).toFixed(1)) : 0;
+      avgBounceRate = totalSent > 0 ? Number(((totalBounces / totalSent) * 100).toFixed(1)) : 0;
     }
 
     return reply.send({
       data: {
         total_contacts: Number(contactStats.total),
         active_contacts: Number(contactStats.active),
+        total_sent: sentCampaigns.reduce((sum, c) => sum + Number(c.total_sent), 0),
         avg_open_rate: avgOpenRate,
         avg_click_rate: avgClickRate,
         bounce_rate: avgBounceRate,
@@ -95,17 +95,17 @@ export const reportRoutes: FastifyPluginAsync = async (app) => {
       .execute();
 
     const data = campaigns.map((c) => {
-      const delivered = c.total_delivered || 1;
+      const sent = Number(c.total_sent) || 1;
       return {
         id: c.id,
         name: c.name,
         sent_at: c.send_started_at,
-        total_sent: c.total_sent,
-        total_delivered: c.total_delivered,
-        open_rate: Number(((c.total_human_opens / delivered) * 100).toFixed(2)),
-        click_rate: Number(((c.total_human_clicks / delivered) * 100).toFixed(2)),
-        bounce_rate: Number(((c.total_bounces / (c.total_sent || 1)) * 100).toFixed(2)),
-        unsubscribe_rate: Number(((c.total_unsubscribes / delivered) * 100).toFixed(2)),
+        total_sent: Number(c.total_sent),
+        total_delivered: Number(c.total_delivered),
+        open_rate: Number(((Number(c.total_human_opens) / sent) * 100).toFixed(1)),
+        click_rate: Number(((Number(c.total_human_clicks) / sent) * 100).toFixed(1)),
+        bounce_rate: Number(((Number(c.total_bounces) / sent) * 100).toFixed(1)),
+        unsubscribe_rate: Number(((Number(c.total_unsubscribes) / sent) * 100).toFixed(1)),
       };
     });
 

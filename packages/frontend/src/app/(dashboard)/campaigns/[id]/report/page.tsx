@@ -65,15 +65,15 @@ export default function CampaignReportPage({ params }: { params: Promise<{ id: s
   const recipients = recipientsData?.data ?? [];
   const recipientsTotal = recipientsData?.meta?.total ?? 0;
 
-  const deliveredRate = campaign && campaign.total_sent > 0
-    ? (campaign.total_delivered / campaign.total_sent) * 100
-    : 0;
-  const openRate = campaign && campaign.total_sent > 0
-    ? (campaign.total_opens / campaign.total_sent) * 100
-    : 0;
-  const clickRate = campaign && campaign.total_sent > 0
-    ? (campaign.total_clicks / campaign.total_sent) * 100
-    : 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stats = (report as any)?.stats as Record<string, number> | undefined;
+  const deliveredRate = stats?.delivery_rate ?? 0;
+  const openRate = stats?.open_rate ?? 0;
+  const uniqueOpenRate = stats?.unique_open_rate ?? 0;
+  const clickRate = stats?.click_rate ?? 0;
+  const uniqueClickRate = stats?.unique_click_rate ?? 0;
+  const uniqueOpens = stats?.unique_opens ?? 0;
+  const uniqueClicks = stats?.unique_clicks ?? 0;
 
   const recipientColumns: Column<Recipient>[] = [
     {
@@ -154,8 +154,10 @@ export default function CampaignReportPage({ params }: { params: Promise<{ id: s
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <StatCard label="Sent" value={formatNumber(campaign.total_sent)} />
               <StatCard label="Delivered" value={formatNumber(campaign.total_delivered)} trend={`${formatPercent(deliveredRate)}`} trendUp={deliveredRate > 95} />
-              <StatCard label="Opens" value={formatNumber(campaign.total_opens)} trend={formatPercent(openRate)} trendUp={openRate > 20} />
-              <StatCard label="Clicks" value={formatNumber(campaign.total_clicks)} trend={formatPercent(clickRate)} trendUp={clickRate > 3} />
+              <StatCard label="Unique Opens" value={formatNumber(uniqueOpens)} trend={formatPercent(uniqueOpenRate)} trendUp={uniqueOpenRate > 20} />
+              <StatCard label="Total Opens" value={formatNumber(campaign.total_opens)} trend={formatPercent(openRate)} trendUp={openRate > 20} />
+              <StatCard label="Unique Clicks" value={formatNumber(uniqueClicks)} trend={formatPercent(uniqueClickRate)} trendUp={uniqueClickRate > 3} />
+              <StatCard label="Total Clicks" value={formatNumber(campaign.total_clicks)} trend={formatPercent(clickRate)} trendUp={clickRate > 3} />
               <StatCard label="Bounces" value={formatNumber(campaign.total_bounces)} />
               <StatCard label="Complaints" value={formatNumber(campaign.total_complaints)} />
             </div>

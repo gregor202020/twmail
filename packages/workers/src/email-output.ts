@@ -28,17 +28,11 @@ export function isMjmlSource(html: string): boolean {
  *
  * @throws Error with OPS-05 code if relative URLs are found, including up to 3 examples.
  */
-export function assertAbsoluteUrls(html: string, campaignId: number): void {
-  const pattern = /(?:src|href)="(?!https?:|mailto:|tel:|cid:|data:|#|\{\{|$)([^"]{1,200})"/gi;
-  const matches: string[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(html)) !== null && matches.length < 3) {
-    matches.push(match[1]!);
-  }
-
-  if (matches.length > 0) {
-    const samples = matches.join(', ');
-    throw new Error(`OPS-05: Campaign ${campaignId} contains relative URLs in email HTML: ${samples}`);
-  }
+export function assertAbsoluteUrls(html: string, campaignId: number): string {
+  const baseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || 'https://mail.thirdwavebbq.com.au';
+  // Convert relative URLs to absolute instead of throwing
+  return html.replace(
+    /((?:src|href)=")(?!https?:|mailto:|tel:|cid:|data:|#|\{\{|$)([^"]{1,200})(")/gi,
+    (_match, prefix, relUrl, suffix) => `${prefix}${baseUrl}${relUrl.startsWith('/') ? '' : '/'}${relUrl}${suffix}`,
+  );
 }

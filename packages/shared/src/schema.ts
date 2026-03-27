@@ -222,6 +222,8 @@ export interface CampaignsTable {
   utm_content: Generated<string>;
   ga_tracking: Generated<boolean>;
   tracking_domain: Generated<string>;
+  open_tracking: Generated<boolean>;
+  click_tracking: Generated<boolean>;
   send_time_optimization: Generated<boolean>;
   total_sent: Generated<number>;
   total_delivered: Generated<number>;

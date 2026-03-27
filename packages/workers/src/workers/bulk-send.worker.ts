@@ -155,8 +155,8 @@ export function createBulkSendWorker(): Worker {
         return { skipped: true, reason: 'uncompiled_mjml' };
       }
 
-      // OPS-05: Reject relative URLs before processing
-      assertAbsoluteUrls(html, campaignId);
+      // OPS-05: Convert relative URLs to absolute
+      html = assertAbsoluteUrls(html, campaignId);
 
       // BUG-02: Idempotency check -- skip if already sent for this campaign/contact
       const skipSend = await shouldSkipSend(db, campaignId, contactId);
@@ -188,13 +188,18 @@ export function createBulkSendWorker(): Worker {
         html = processMergeTags(html, contact, messageId);
         subject = processMergeTags(subject, contact, messageId);
 
-        // Inject tracking pixel
-        html = injectTrackingPixel(html, messageId);
+        // Inject tracking pixel (unless disabled)
+        let linkMap: Record<string, string> = {};
+        if (campaign.open_tracking !== false) {
+          html = injectTrackingPixel(html, messageId);
+        }
 
-        // Rewrite links for click tracking
-        const linkResult = rewriteLinks(html, messageId);
-        html = linkResult.html;
-        const linkMap = linkResult.linkMap;
+        // Rewrite links for click tracking (unless disabled)
+        if (campaign.click_tracking !== false) {
+          const linkResult = rewriteLinks(html, messageId);
+          html = linkResult.html;
+          linkMap = linkResult.linkMap;
+        }
 
         // Inject preview text if present
         if (previewText) {

@@ -162,6 +162,8 @@ export interface Campaign {
   utm_content: string | null;
   ga_tracking: boolean;
   tracking_domain: string | null;
+  open_tracking: boolean;
+  click_tracking: boolean;
   send_time_optimization: boolean;
   scheduled_at: string | null;
   timezone: string | null;

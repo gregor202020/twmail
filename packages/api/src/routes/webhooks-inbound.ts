@@ -116,15 +116,6 @@ async function verifySnsSignature(
 }
 
 export const webhooksInboundRoutes: FastifyPluginAsync = async (app) => {
-  // Accept text/plain content type from SNS
-  app.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => {
-    try {
-      done(null, JSON.parse(body as string));
-    } catch (err) {
-      done(err as Error, undefined);
-    }
-  });
-
   // POST /api/webhooks/inbound/sns — SES SNS notification receiver
   app.post('/inbound/sns', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
