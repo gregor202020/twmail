@@ -211,7 +211,16 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
     const tagsArray = typeof tags === 'string'
       ? tags.split(',').map(t => t.trim()).filter(Boolean)
       : Array.isArray(tags) ? tags : [];
-    onSave({ ...apiFields, tags: tagsArray as unknown as string });
+    // Build resend_config from form fields so the worker can use it
+    const resend_config = apiFields.resend_enabled
+      ? {
+          wait_hours: parseInt(resend_delay) || 24,
+          trigger: 'non_open' as const,
+          new_subject: resend_subject_change === 'different' ? resend_different_subject : undefined,
+          only_engaged_days: resend_engaged_only ? 90 : undefined,
+        }
+      : null;
+    onSave({ ...apiFields, tags: tagsArray as unknown as string, resend_config });
   }, [onSave]);
 
   const toggleSection = (idx: number) => {
