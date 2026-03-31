@@ -418,8 +418,10 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         .catch(() => {});
     }, []);
 
+    const uploadingRef = useRef(false);
     const handleImageUpload = useCallback(async (files: FileList | null) => {
-      if (!files || files.length === 0) return;
+      if (!files || files.length === 0 || uploadingRef.current) return;
+      uploadingRef.current = true;
       setUploading(true);
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) continue;
@@ -441,6 +443,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         } catch (err) { console.error('Upload error:', err); alert('Upload failed: ' + (err instanceof Error ? err.message : 'Unknown error')); }
       }
       setUploading(false);
+      uploadingRef.current = false;
     }, []);
 
     const insertImageIntoEditor = useCallback((url: string) => {
@@ -1073,7 +1076,7 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
                     <label className="flex flex-col items-center gap-2 p-4 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-400/5 transition-colors">
                       <Upload className="w-6 h-6 text-gray-500" />
                       <span className="text-xs text-gray-400 font-medium">{uploading ? 'Uploading...' : 'Click to upload images'}</span>
-                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} disabled={uploading} />
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { handleImageUpload(e.target.files); e.target.value = ''; }} disabled={uploading} />
                     </label>
                     {uploadedImages.length > 0 && (
                       <div className="space-y-2">
