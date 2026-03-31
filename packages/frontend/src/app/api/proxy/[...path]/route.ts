@@ -88,3 +88,4 @@ export const POST = proxyRequest;
 export const PATCH = proxyRequest;
 export const PUT = proxyRequest;
 export const DELETE = proxyRequest;
+

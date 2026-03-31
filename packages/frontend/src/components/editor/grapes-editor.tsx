@@ -295,7 +295,8 @@ function PropertyFieldInput({
   const commit = () => {
     let v = local;
     // Auto-append px for size fields if user typed a bare number
-    if (SIZE_KEYS.includes(field.key) && v && /^\d+(\.\d+)?$/.test(v.trim())) {
+    const bareKey = field.key.replace(/^style:/, '');
+    if (SIZE_KEYS.includes(bareKey) && v && /^\d+(\.\d+)?$/.test(v.trim())) {
       v = v.trim() + 'px';
       setLocal(v);
     }
@@ -432,8 +433,12 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
             const newImg = { id: asset.id, url: asset.url, filename: asset.original_name || asset.filename };
             setUploadedImages(prev => [newImg, ...prev]);
             editorRef.current?.AssetManager.add({ src: asset.url, name: asset.original_name });
+          } else {
+            const text = await res.text().catch(() => '');
+            console.error('Upload failed:', res.status, text);
+            alert(`Upload failed (${res.status}): ${text.slice(0, 200)}`);
           }
-        } catch { /* ignore */ }
+        } catch (err) { console.error('Upload error:', err); alert('Upload failed: ' + (err instanceof Error ? err.message : 'Unknown error')); }
       }
       setUploading(false);
     }, []);
