@@ -810,7 +810,12 @@ export function CampaignAccordion({ campaign, onSave, onSend, onSchedule, isSavi
                   size="sm"
                   disabled={!allValid || !formData.scheduled_date || !formData.scheduled_time}
                   onClick={() => {
-                    const scheduledAt = `${formData.scheduled_date}T${formData.scheduled_time}:00`;
+                    // Convert local time in selected timezone to UTC ISO string
+                    const localStr = `${formData.scheduled_date}T${formData.scheduled_time}:00`;
+                    const utcDate = new Date(new Date(localStr).toLocaleString('en-US', { timeZone: 'UTC' }));
+                    const tzDate = new Date(new Date(localStr).toLocaleString('en-US', { timeZone: formData.timezone }));
+                    const offset = utcDate.getTime() - tzDate.getTime();
+                    const scheduledAt = new Date(new Date(localStr).getTime() + offset).toISOString();
                     onSchedule(scheduledAt, formData.timezone);
                   }}
                 >

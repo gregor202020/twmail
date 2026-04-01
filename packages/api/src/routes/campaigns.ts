@@ -41,7 +41,7 @@ const createSchema = z.object({
 const updateSchema = createSchema.partial().strip();
 
 const scheduleSchema = z.object({
-  scheduled_at: z.string().datetime(),
+  scheduled_at: z.string(),
   timezone: z.string().optional(),
 });
 
@@ -359,8 +359,8 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Can only schedule draft campaigns');
     }
 
-    const scheduledAt = new Date(body.scheduled_at);
-    if (scheduledAt <= new Date()) {
+    const scheduledAt = new Date(body.scheduled_at.endsWith('Z') || /[+-]\d{2}/.test(body.scheduled_at) ? body.scheduled_at : body.scheduled_at + 'Z');
+    if (isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
       throw new AppError(400, ErrorCode.VALIDATION_ERROR, 'Scheduled time must be in the future');
     }
 
