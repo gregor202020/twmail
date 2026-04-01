@@ -215,6 +215,8 @@ export interface CampaignsTable {
   resend_config: Record<string, unknown> | null;
   resend_of: number | null;
   sending_domain: Generated<string>;
+  warmup_enabled: Generated<boolean>;
+  warmup_config: Record<string, unknown> | null;
   tags: Generated<string[]>;
   utm_enabled: Generated<boolean>;
   utm_source: Generated<string>;

@@ -83,7 +83,9 @@ export function createCampaignSendWorker(): Worker {
       });
 
       try {
-        if (campaign.ab_test_enabled && campaign.ab_test_config) {
+        if (campaign.warmup_enabled && campaign.warmup_config) {
+          await handleWarmupSend(db, redis, bulkSendQueue, campaignId, contactIds, campaign);
+        } else if (campaign.ab_test_enabled && campaign.ab_test_config) {
           await handleAbTestSend(db, redis, bulkSendQueue, campaignId, contactIds, campaign);
         } else {
           await handleStandardSend(redis, bulkSendQueue, campaignId, contactIds);
@@ -234,4 +236,99 @@ async function handleAbTestSend(
       'A/B test contacts distributed',
     );
   }
+}
+
+/**
+ * Warmup send: splits contacts into daily batches with increasing volumes.
+ * Prioritises Gmail contacts first, then Microsoft, then others.
+ * Each day's batch is delayed by 24h increments using BullMQ delayed jobs.
+ */
+
+const WARMUP_SCHEDULES: Record<string, number[]> = {
+  week1: [500, 500, 750, 750, 800, 800, 0], // 0 = remainder
+  week2: [1500, 1500, 2000, 2000, 3000, 3000, 4000],
+  week3: [5000, 5000, 7500, 7500, 10000, 10000, 12500],
+  week4: [15000, 15000, 20000, 20000, 25000, 25000, 30000],
+  week5: [40000, 50000, 60000, 75000, 90000, 110000, 130000],
+  week6: [150000, 150000, 150000, 150000, 150000, 150000, 150000],
+};
+
+async function handleWarmupSend(
+  db: ReturnType<typeof getDb>,
+  redis: ReturnType<typeof getRedis>,
+  bulkSendQueue: Queue,
+  campaignId: number,
+  contactIds: number[],
+  campaign: { warmup_config: Record<string, unknown> | null },
+): Promise<void> {
+  const config = (campaign.warmup_config ?? {}) as {
+    week?: string;
+    send_hour?: number;
+  };
+  const week = config.week ?? 'week1';
+  const schedule = WARMUP_SCHEDULES[week] ?? WARMUP_SCHEDULES.week1!;
+
+  // Load contact emails for domain-based sorting
+  const contacts = await db
+    .selectFrom('contacts')
+    .select(['id', 'email'])
+    .where('id', 'in', contactIds)
+    .execute();
+
+  // Sort: Gmail first, then Microsoft, then Yahoo, then others
+  const gmail: number[] = [];
+  const microsoft: number[] = [];
+  const yahoo: number[] = [];
+  const other: number[] = [];
+
+  for (const c of contacts) {
+    const domain = c.email.split('@')[1]?.toLowerCase() ?? '';
+    if (domain === 'gmail.com') gmail.push(c.id);
+    else if (['hotmail.com', 'outlook.com', 'live.com', 'live.com.au', 'msn.com'].includes(domain)) microsoft.push(c.id);
+    else if (domain.includes('yahoo.')) yahoo.push(c.id);
+    else other.push(c.id);
+  }
+
+  const sorted = [...gmail, ...microsoft, ...yahoo, ...other];
+
+  // Split into daily batches
+  let offset = 0;
+  const batches: number[][] = [];
+  for (let day = 0; day < schedule.length; day++) {
+    const volume = schedule[day]!;
+    if (volume === 0 || day === schedule.length - 1) {
+      // Last day or remainder: take everything left
+      batches.push(sorted.slice(offset));
+      break;
+    }
+    batches.push(sorted.slice(offset, offset + volume));
+    offset += volume;
+    if (offset >= sorted.length) break;
+  }
+
+  // Set Redis counter for ALL contacts (campaign completion tracks total)
+  await redis.set(`twmail:remaining:${campaignId}`, sorted.length, 'EX', 604800 * 2);
+
+  // Enqueue each day's batch with a 24h delay increment
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  for (let day = 0; day < batches.length; day++) {
+    const batch = batches[day]!;
+    if (batch.length === 0) continue;
+
+    const delay = day * MS_PER_DAY; // Day 0 = now, Day 1 = +24h, etc.
+
+    for (const contactId of batch) {
+      await bulkSendQueue.add('send', { contactId, campaignId }, delay > 0 ? { delay } : {});
+    }
+
+    logger.info(
+      { campaignId, day: day + 1, count: batch.length, delayHours: delay / 3600000 },
+      'Warmup batch queued',
+    );
+  }
+
+  logger.info(
+    { campaignId, totalContacts: sorted.length, totalDays: batches.length, week },
+    'Warmup send orchestration complete',
+  );
 }

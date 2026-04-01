@@ -155,6 +155,8 @@ export interface Campaign {
   resend_enabled: boolean;
   resend_config: Record<string, unknown> | null;
   sending_domain: string;
+  warmup_enabled: boolean;
+  warmup_config: Record<string, unknown> | null;
   tags: string | null;
   utm_enabled: boolean;
   utm_source: string | null;
