@@ -64,6 +64,7 @@ export async function startScheduler(): Promise<{ interval: NodeJS.Timeout; queu
         .select(['id'])
         .where('status', '=', CampaignStatus.SENDING)
         .where('send_started_at', '<=', staleThreshold)
+        .where('warmup_enabled', '=', false)
         .execute();
 
       for (const campaign of stuck) {
