@@ -538,13 +538,11 @@ export const GrapesEditor = forwardRef<GrapesEditorRef, GrapesEditorProps>(
         setSelectedAttrs((prev: Record<string, string>) => ({ ...prev, [key]: value }));
         return;
       }
-      const attrs = comp.getAttributes();
       if (value) {
-        attrs[key] = value;
+        comp.addAttributes({ [key]: value });
       } else {
-        delete attrs[key];
+        comp.removeAttributes([key]);
       }
-      comp.set('attributes', { ...attrs });
       // Also set as trait for MJML components (href, src, alt, etc.)
       const trait = comp.getTrait(key);
       if (trait) {
