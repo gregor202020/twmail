@@ -152,20 +152,20 @@ export default function CampaignReportPage({ params }: { params: Promise<{ id: s
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <StatCard label="Sent" value={formatNumber(campaign.total_sent)} />
-              <StatCard label="Delivered" value={formatNumber(campaign.total_delivered)} trend={`${formatPercent(deliveredRate)}`} trendUp={deliveredRate > 95} />
+              <StatCard label="Sent" value={formatNumber(stats?.total_sent ?? campaign.total_sent)} />
+              <StatCard label="Delivered" value={formatNumber(stats?.total_delivered ?? campaign.total_delivered)} trend={`${formatPercent(deliveredRate)}`} trendUp={deliveredRate > 95} />
               <StatCard label="Unique Opens" value={formatNumber(uniqueOpens)} trend={formatPercent(uniqueOpenRate)} trendUp={uniqueOpenRate > 20} />
               <StatCard label="Unique Clicks" value={formatNumber(uniqueClicks)} trend={formatPercent(uniqueClickRate)} trendUp={uniqueClickRate > 3} />
-              <StatCard label="Bounces" value={formatNumber(campaign.total_bounces)} />
-              <StatCard label="Complaints" value={formatNumber(campaign.total_complaints)} />
+              <StatCard label="Bounces" value={formatNumber(stats?.total_bounces ?? campaign.total_bounces)} />
+              <StatCard label="Complaints" value={formatNumber(stats?.total_complaints ?? campaign.total_complaints)} />
             </div>
           )}
 
           {/* Delivery Funnel */}
           {campaign && (
             <DeliveryFunnel
-              sent={campaign.total_sent}
-              delivered={campaign.total_delivered}
+              sent={stats?.total_sent ?? campaign.total_sent}
+              delivered={stats?.total_delivered ?? campaign.total_delivered}
               opened={uniqueOpens}
               clicked={uniqueClicks}
             />
