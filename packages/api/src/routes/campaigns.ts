@@ -536,34 +536,70 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       .orderBy('created_at', 'asc')
       .execute();
 
-    // Unique opens/clicks from messages table
-    const uniqueCounts = await db
+    // For resend campaigns, exclude contacts who opened the parent campaign
+    // so the dashboard reflects only the resend audience.
+    let excludedContactIds: number[] = [];
+    if (campaign.resend_of) {
+      const parentOpeners = await db
+        .selectFrom('messages')
+        .select('contact_id')
+        .where('campaign_id', '=', campaign.resend_of)
+        .where('first_open_at', 'is not', null)
+        .execute();
+      excludedContactIds = parentOpeners.map(r => Number(r.contact_id));
+    }
+
+    // Compute stats from messages table, filtering excluded contacts.
+    // For resend campaigns this gives accurate per-resend numbers; for
+    // standard campaigns it matches the cached counters.
+    let messageQuery = db
       .selectFrom('messages')
       .select([
+        sql<number>`count(*)`.as('sent'),
+        sql<number>`count(*) filter (where status >= 3)`.as('delivered'),
         sql<number>`count(*) filter (where first_open_at is not null)`.as('unique_opens'),
         sql<number>`count(*) filter (where first_click_at is not null)`.as('unique_clicks'),
+        sql<number>`count(*) filter (where status = 6)`.as('bounces'),
+        sql<number>`count(*) filter (where status = 7)`.as('complaints'),
+        sql<number>`count(*) filter (where status = 8)`.as('unsubscribes'),
       ])
-      .where('campaign_id', '=', id)
-      .executeTakeFirst();
+      .where('campaign_id', '=', id);
+    if (excludedContactIds.length > 0) {
+      messageQuery = messageQuery.where('contact_id', 'not in', excludedContactIds);
+    }
+    const messageCounts = await messageQuery.executeTakeFirst();
 
-    const nSent = Number(campaign.total_sent) || 1;
-    const nOpens = Number(campaign.total_human_opens);
-    const nClicks = Number(campaign.total_human_clicks);
-    const nBounces = Number(campaign.total_bounces);
-    const nComplaints = Number(campaign.total_complaints);
-    const nUnsubs = Number(campaign.total_unsubscribes);
-    const nUniqueOpens = Number(uniqueCounts?.unique_opens ?? 0);
-    const nUniqueClicks = Number(uniqueCounts?.unique_clicks ?? 0);
+    const isResend = excludedContactIds.length > 0;
+    const nSent = isResend
+      ? (Number(messageCounts?.sent) || 1)
+      : (Number(campaign.total_sent) || 1);
+    const nDelivered = isResend
+      ? Number(messageCounts?.delivered ?? 0)
+      : Number(campaign.total_delivered);
+    const nUniqueOpens = Number(messageCounts?.unique_opens ?? 0);
+    const nUniqueClicks = Number(messageCounts?.unique_clicks ?? 0);
+    const nOpens = isResend ? nUniqueOpens : Number(campaign.total_human_opens);
+    const nClicks = isResend ? nUniqueClicks : Number(campaign.total_human_clicks);
+    const nBounces = isResend
+      ? Number(messageCounts?.bounces ?? 0)
+      : Number(campaign.total_bounces);
+    const nComplaints = isResend
+      ? Number(messageCounts?.complaints ?? 0)
+      : Number(campaign.total_complaints);
+    const nUnsubs = isResend
+      ? Number(messageCounts?.unsubscribes ?? 0)
+      : Number(campaign.total_unsubscribes);
+
     const stats = {
-      total_sent: Number(campaign.total_sent),
-      total_delivered: Number(campaign.total_delivered),
-      delivery_rate: Number(((Number(campaign.total_delivered) / nSent) * 100).toFixed(1)),
-      total_opens: Number(campaign.total_opens),
+      total_sent: nSent,
+      total_delivered: nDelivered,
+      delivery_rate: Number(((nDelivered / nSent) * 100).toFixed(1)),
+      total_opens: isResend ? nUniqueOpens : Number(campaign.total_opens),
       total_human_opens: nOpens,
       unique_opens: nUniqueOpens,
       open_rate: Number(((nOpens / nSent) * 100).toFixed(1)),
       unique_open_rate: Number(((nUniqueOpens / nSent) * 100).toFixed(1)),
-      total_clicks: Number(campaign.total_clicks),
+      total_clicks: isResend ? nUniqueClicks : Number(campaign.total_clicks),
       total_human_clicks: nClicks,
       unique_clicks: nUniqueClicks,
       click_rate: Number(((nClicks / nSent) * 100).toFixed(1)),
@@ -577,8 +613,8 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       unsubscribe_rate: Number(((nUnsubs / nSent) * 100).toFixed(1)),
     };
 
-    // Timeline: opens and clicks by date
-    const timelineRows = await db
+    // Timeline: opens and clicks by date (filtered for resends)
+    let timelineQuery = db
       .selectFrom('events')
       .select([
         sql<string>`date(event_time)`.as('date'),
@@ -586,7 +622,11 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
         sql<number>`count(*) filter (where event_type = ${sql.lit(EventType.CLICK)})`.as('clicks'),
       ])
       .where('campaign_id', '=', id)
-      .where('event_type', 'in', [EventType.OPEN, EventType.MACHINE_OPEN, EventType.CLICK])
+      .where('event_type', 'in', [EventType.OPEN, EventType.MACHINE_OPEN, EventType.CLICK]);
+    if (excludedContactIds.length > 0) {
+      timelineQuery = timelineQuery.where('contact_id', 'not in', excludedContactIds);
+    }
+    const timelineRows = await timelineQuery
       .groupBy(sql`date(event_time)`)
       .orderBy('date', 'asc')
       .execute();
